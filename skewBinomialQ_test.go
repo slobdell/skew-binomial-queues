@@ -1,6 +1,7 @@
 package skewBinomialQ_test
 
 import (
+	"math/rand"
 	"skewBinomialQ"
 	"testing"
 	"unsafe"
@@ -197,4 +198,39 @@ func TestListIter(t *testing.T) {
 			t.Error("Values not equal")
 		}
 	}
+}
+
+func TestSpeed(t *testing.T) {
+	/* perhaps disable in some cases...test speed for various implementations */
+
+	var randomNumbers []int
+	sampleSize := 100
+	var seed int64 = 10
+	r1 := rand.New(rand.NewSource(seed))
+	for i := 0; i < sampleSize; i++ {
+		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+	}
+
+	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	for _, number := range randomNumbers {
+		q = q.Enqueue(
+			IntegerQueuePriority{number},
+		)
+	}
+
+	var priority skewBinomialQ.QueuePriority
+	for {
+		priority, q = q.Dequeue()
+		_, ok := priority.(IntegerQueuePriority)
+		if ok {
+			// successful dequeue
+		} else {
+			// reached empty queue
+			break
+		}
+	}
+}
+
+func TestFreeListQueue(t *testing.T) {
+	skewBinomialQ.NewFreeListQueue()
 }

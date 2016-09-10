@@ -24,7 +24,6 @@ type Node interface {
 	IsEmpty() bool
 }
 
-// TODO make the queue use this interface
 type PriorityQueue interface {
 	Enqueue(priority QueuePriority) PriorityQueue
 	Peek() QueuePriority
@@ -104,8 +103,7 @@ func highestPriorityHeap(heaps ...Node) Node {
 	return heaps[0]
 }
 
-func lowerPriorityHeaps(heaps ...Node) []Node {
-	// TODO rename this to lowerRankedHeaps
+func lowerRankHeaps(heaps ...Node) []Node {
 	sort.Sort(
 		byPriority(
 			heaps,
@@ -148,7 +146,7 @@ func (s SkewBinomialHeap) Link(heaps ...Node) Node {
 		highestPriorityHeap(heaps...).Peek(),
 		heaps[len(heaps)-1].Rank()+1,
 		append(
-			lowerPriorityHeaps(heaps...),
+			lowerRankHeaps(heaps...),
 			highestPriorityHeap(heaps...).Children()...,
 		),
 	)
