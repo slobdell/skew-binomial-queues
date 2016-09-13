@@ -1,6 +1,7 @@
 package skewBinomialQ
 
 import (
+	"fmt"
 	"sync/atomic"
 	"unsafe"
 )
@@ -264,6 +265,7 @@ func (t *ThreadSafeList) PopFirst() unsafe.Pointer {
 	// TODO add tests
 	currentHead := t.head
 	if currentHead == nil {
+		fmt.Printf("CURRENT HEAD IS NIL\n")
 		return nil
 	}
 	operationSucceeded := t.deleteNode(currentHead, nil)
