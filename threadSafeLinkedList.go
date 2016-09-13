@@ -32,6 +32,12 @@ type ThreadSafeList struct {
 	spinLock SpinLock
 }
 
+type TrySplitParameter struct {
+	N            int
+	currentNode  *listNode
+	previousNode *listNode
+}
+
 type markablePointer struct {
 	marked bool
 	next   *listNode
@@ -41,7 +47,12 @@ func (t *ThreadSafeList) InsertObject(object unsafe.Pointer, lessThanFn func(uns
 	currentHeadAddress := &t.head
 	currentHead := t.head
 
-	if currentHead == nil || lessThanFn(object, currentHead.object) {
+	// go doesn't use short circuiting so we need to do this sort of whacky logic
+	shouldInsertAtHead := currentHead == nil
+	if !shouldInsertAtHead {
+		shouldInsertAtHead = lessThanFn(object, currentHead.object)
+	}
+	if shouldInsertAtHead {
 		newNode := listNode{
 			object: object,
 			markableNext: &markablePointer{
@@ -55,14 +66,27 @@ func (t *ThreadSafeList) InsertObject(object unsafe.Pointer, lessThanFn func(uns
 			unsafe.Pointer(&newNode),
 		)
 		if !operationSucceeded {
+			// retry here is cheap since it's at head
 			t.InsertObject(object, lessThanFn)
 		}
 		return
 	}
 
+	var previousForRetry *listNode = nil
 	cursor := t.head
 	for {
-		if cursor.markableNext.next == nil || lessThanFn(object, cursor.markableNext.next.object) {
+		// extra check needed for thread safety
+		if cursor == nil {
+			t.InsertObject(object, lessThanFn)
+			return
+		}
+		nextNode := cursor.markableNext.next
+		// get around no short circuiting
+		shouldInsertNext := nextNode == nil
+		if !shouldInsertNext {
+			shouldInsertNext = lessThanFn(object, nextNode.object)
+		}
+		if shouldInsertNext {
 			currentNext := cursor.markableNext
 			if currentNext.marked {
 				continue
@@ -81,12 +105,15 @@ func (t *ThreadSafeList) InsertObject(object unsafe.Pointer, lessThanFn func(uns
 				unsafe.Pointer(currentNext),
 				unsafe.Pointer(&newNext),
 			)
-			if !operationSucceeded {
-				t.InsertObject(object, lessThanFn)
-				return
+			if operationSucceeded {
+				break
+			} else {
+				// try again from the current node
+				cursor = previousForRetry
 			}
 			break
 		}
+		previousForRetry = cursor
 		cursor = cursor.markableNext.next
 	}
 }
@@ -109,56 +136,141 @@ func (t *ThreadSafeList) PopHead() unsafe.Pointer {
 	return currentHead.object
 }
 
-func (t *ThreadSafeList) DeleteObject(object unsafe.Pointer) {
+func (t *ThreadSafeList) deleteNode(node, previous *listNode) (success bool) {
+	nextNode := node.markableNext.next
+	newNext := markablePointer{
+		marked: true,
+		next:   nextNode,
+	}
+	operationSucceeded := atomic.CompareAndSwapPointer(
+		(*unsafe.Pointer)(unsafe.Pointer(&(node.markableNext))),
+		unsafe.Pointer(node.markableNext),
+		unsafe.Pointer(&newNext),
+	)
+	if !operationSucceeded {
+		// something was inserted while trying to delete
+		return false
+	}
+	newNext = markablePointer{
+		next: nextNode,
+	}
+	if previous != nil {
+		operationSucceeded = atomic.CompareAndSwapPointer(
+			(*unsafe.Pointer)(unsafe.Pointer(&(previous.markableNext))),
+			unsafe.Pointer(previous.markableNext),
+			unsafe.Pointer(&newNext),
+		)
+	} else {
+		// we just delete head
+		currentHeadAddress := &t.head
+		currentHead := t.head
+		operationSucceeded = atomic.CompareAndSwapPointer(
+			(*unsafe.Pointer)(unsafe.Pointer(currentHeadAddress)),
+			unsafe.Pointer(currentHead),
+			unsafe.Pointer(nextNode),
+		)
+	}
+	return operationSucceeded
+}
+
+func (t *ThreadSafeList) DeleteObject(object unsafe.Pointer) (success bool) {
 	var previous *listNode
-	currentHeadAddress := &t.head
-	currentHead := t.head
-	cursor := currentHead
+	cursor := t.head
 	for {
 		if cursor == nil {
 			break
 		}
 		if cursor.object == object {
-			nextNode := cursor.markableNext.next
-			newNext := markablePointer{
-				marked: true,
-				next:   nextNode,
-			}
-			operationSucceeded := atomic.CompareAndSwapPointer(
-				(*unsafe.Pointer)(unsafe.Pointer(&(cursor.markableNext))),
-				unsafe.Pointer(cursor.markableNext),
-				unsafe.Pointer(&newNext),
-			)
+			operationSucceeded := t.deleteNode(cursor, previous)
 			if !operationSucceeded {
-				t.DeleteObject(object)
-				return
+				return t.DeleteObject(object)
 			}
-			newNext = markablePointer{
-				next: nextNode,
-			}
-			if previous != nil {
-				operationSucceeded = atomic.CompareAndSwapPointer(
-					(*unsafe.Pointer)(unsafe.Pointer(&(previous.markableNext))),
-					unsafe.Pointer(previous.markableNext),
-					unsafe.Pointer(&newNext),
-				)
-			} else {
-				// we just deleted head
-				operationSucceeded = atomic.CompareAndSwapPointer(
-					(*unsafe.Pointer)(unsafe.Pointer(currentHeadAddress)),
-					unsafe.Pointer(currentHead),
-					unsafe.Pointer(nextNode),
-				)
-			}
-			if !operationSucceeded {
-				t.DeleteObject(object)
-			}
-			break
+			return true
 		}
 
 		previous = cursor
 		cursor = cursor.markableNext.next
 	}
+	return false
+}
+
+func (t *ThreadSafeList) TrySplitLastN(params TrySplitParameter) []unsafe.Pointer {
+	/*
+		In the multi-threaded environment, it's possible during this split function
+		to split greater than or fewer objects specified by the function parameters
+		if concurrent adds or deletes are happening.
+	*/
+	var returnObjects []unsafe.Pointer
+	currentNode := params.currentNode
+	currentHead := t.head
+	if currentHead == nil || params.N == 0 {
+		return returnObjects
+	}
+	if currentNode == nil {
+		currentNode = currentHead
+	}
+	var downstreamReturnObjects []unsafe.Pointer
+	nextNode := currentNode.markableNext.next
+	if nextNode != nil {
+		downstreamReturnObjects = t.TrySplitLastN(
+			TrySplitParameter{
+				N:            params.N,
+				currentNode:  nextNode,
+				previousNode: currentNode,
+			},
+		)
+	}
+	if len(downstreamReturnObjects) < params.N {
+		objToPop := currentNode.object
+		operationSucceeded := t.deleteNode(currentNode, params.previousNode)
+		if operationSucceeded {
+			returnObjects = append(downstreamReturnObjects, objToPop)
+		} else {
+			returnObjects = downstreamReturnObjects
+		}
+		return returnObjects
+	}
+	return downstreamReturnObjects
+}
+
+func (t ThreadSafeList) Count() int {
+	count := 0
+	for cursor := t.head; cursor != nil; cursor = cursor.markableNext.next {
+		count++
+	}
+	return count
+}
+
+func (t ThreadSafeList) LengthGreaterThan(n int) bool {
+	// TODO add tests
+	count := 0
+	for cursor := t.head; cursor != nil; cursor = cursor.markableNext.next {
+		count++
+		if count > n {
+			return true
+		}
+	}
+	return false
+}
+
+func (t ThreadSafeList) Peek() unsafe.Pointer {
+	if t.head == nil {
+		return nil
+	}
+	return t.head.object
+}
+
+func (t *ThreadSafeList) PopFirst() unsafe.Pointer {
+	// TODO add tests
+	currentHead := t.head
+	if currentHead == nil {
+		return nil
+	}
+	operationSucceeded := t.deleteNode(currentHead, nil)
+	if operationSucceeded {
+		return currentHead.object
+	}
+	return t.PopFirst()
 }
 
 func (t ThreadSafeList) Iter() <-chan unsafe.Pointer {
@@ -175,4 +287,8 @@ func (t ThreadSafeList) Iter() <-chan unsafe.Pointer {
 		close(ch)
 	}()
 	return ch
+}
+
+func NewThreadSafeList() ThreadSafeList {
+	return ThreadSafeList{}
 }

@@ -1,6 +1,7 @@
 package skewBinomialQ_test
 
 import (
+	"fmt"
 	"math/rand"
 	"skewBinomialQ"
 	"testing"
@@ -10,6 +11,8 @@ import (
 type IntegerQueuePriority struct {
 	value int
 }
+
+const TEST_TIME = true
 
 func (i IntegerQueuePriority) LessThan(otherPriority skewBinomialQ.QueuePriority) bool {
 	integerQueuePriority, ok := otherPriority.(IntegerQueuePriority)
@@ -180,6 +183,55 @@ func TestListDeleteObject(t *testing.T) {
 	}
 }
 
+func TestSplitLastN(t *testing.T) {
+	return
+	list := skewBinomialQ.ThreadSafeList{}
+	items := []int64{2, 4, 5, 10, 17, 20, 30}
+
+	for _, item := range items {
+		newlyAllocatedItem := item
+		list.InsertObject(unsafe.Pointer(&newlyAllocatedItem), int64LessThan)
+	}
+	returnedObjects := list.TrySplitLastN(
+		skewBinomialQ.TrySplitParameter{
+			N: 3,
+		},
+	)
+	intReturnedObjects := []int64{}
+	for _, ptr := range returnedObjects {
+		intReturnedObjects = append(intReturnedObjects, *(*int64)(ptr))
+	}
+
+	expectedMutation := []int64{2, 4, 5, 10}
+	var sortedItems []int64
+	for sortedItem := range list.Iter() {
+		sortedItems = append(sortedItems, *(*int64)(sortedItem))
+	}
+	for index := range sortedItems {
+		if sortedItems[index] != expectedMutation[index] {
+			t.Error("Values not equal")
+		}
+	}
+
+	expectedReturnedObjects := []int64{30, 20, 17}
+	for index := range intReturnedObjects {
+		if intReturnedObjects[index] != expectedReturnedObjects[index] {
+			t.Error("Values not equal")
+		}
+	}
+}
+
+func TestListCounter(t *testing.T) {
+	list := skewBinomialQ.ThreadSafeList{}
+	items := []int64{30, 10, 2, 4, 17, 5, 20}
+	for _, item := range items {
+		newlyAllocatedItem := item
+		list.InsertObject(unsafe.Pointer(&newlyAllocatedItem), int64LessThan)
+	}
+	if len(items) != list.Count() {
+		t.Error("Count not equal")
+	}
+}
 func TestListIter(t *testing.T) {
 	list := skewBinomialQ.ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
@@ -201,10 +253,13 @@ func TestListIter(t *testing.T) {
 }
 
 func TestSpeed(t *testing.T) {
-	/* perhaps disable in some cases...test speed for various implementations */
+	return
+	if !TEST_TIME {
+		return
+	}
 
 	var randomNumbers []int
-	sampleSize := 100
+	sampleSize := 10000
 	var seed int64 = 10
 	r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
@@ -231,6 +286,73 @@ func TestSpeed(t *testing.T) {
 	}
 }
 
-func TestFreeListQueue(t *testing.T) {
-	skewBinomialQ.NewFreeListQueue()
+func TestSpeedFreeList(t *testing.T) {
+	if !TEST_TIME {
+		return
+	}
+
+	var randomNumbers []int
+	sampleSize := 100
+	var seed int64 = 10
+	r1 := rand.New(rand.NewSource(seed))
+	for i := 0; i < sampleSize; i++ {
+		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+	}
+
+	q := skewBinomialQ.NewEmptyLazyMergeSkewBinomialQueue()
+	for index, number := range randomNumbers {
+		if index%10000 == 0 {
+			percentDone := 100.0 * (float64(index) / float64(sampleSize))
+			fmt.Printf("added %f items\n", percentDone)
+		}
+		q = q.Enqueue(
+			IntegerQueuePriority{number},
+		)
+	}
+
+	/*
+		var priority skewBinomialQ.QueuePriority
+		for {
+			priority, q = q.Dequeue()
+			_, ok := priority.(IntegerQueuePriority)
+			if ok {
+				// successful dequeue
+			} else {
+				// reached empty queue
+				break
+			}
+		}
+	*/
 }
+
+/*
+func TestLazyMergeSkewBinomialQueue(t *testing.T) {
+	q := skewBinomialQ.NewEmptyLazyMergeSkewBinomialQueue()
+	q = q.Enqueue(
+		IntegerQueuePriority{5},
+	)
+	if q.Length() != 1 {
+		t.Error("Length failure enqueue")
+	}
+	_, q = q.Dequeue()
+	if q.Length() != 0 {
+		t.Error("Length failure dequeue")
+	}
+}
+*/
+
+/*
+func TestFreeListQueue(t *testing.T) {
+	q := skewBinomialQ.NewFreeListQueue()
+	q = q.Enqueue(
+		IntegerQueuePriority{5},
+	)
+	if q.Length() != 1 {
+		t.Error("Length failure enqueue")
+	}
+	_, q = q.Dequeue()
+	if q.Length() != 0 {
+		t.Error("Length failure dequeue")
+	}
+}
+*/

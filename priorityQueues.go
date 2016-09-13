@@ -33,6 +33,8 @@ type PriorityQueue interface {
 	IsEmpty() bool
 }
 
+var NULL_OBJECT = NullObject{}
+
 type NullObject struct {
 	head     *NullObject
 	children []Node
@@ -171,7 +173,7 @@ type SkewBinomialQueue struct {
 
 func NewEmptySkewBinomialQueue() SkewBinomialQueue {
 	return SkewBinomialQueue{
-		heapHead:     NullObject{}, // TODO see if there are performance benefits to making just 1 nullobject singleton
+		heapHead:     NULL_OBJECT,
 		rightSibling: nil,
 	}
 }
@@ -306,7 +308,7 @@ func (q SkewBinomialQueue) asIndividualForests() []SkewBinomialQueue {
 }
 
 func (q SkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
-	if q.heapHead.IsEmpty() {
+	if q.IsEmpty() {
 		return nil, q
 	}
 	poppedQueue, remainingQueue := q.popHighestPriorityQueue()
