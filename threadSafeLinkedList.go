@@ -1,9 +1,6 @@
 package skewBinomialQ
 
 import (
-	"bytes"
-	"runtime"
-	"strconv"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -204,22 +201,10 @@ func (t *ThreadSafeList) hardDeleteNode(previous, node *listNode) {
 		// we just delete head
 		atomic.CompareAndSwapPointer(
 			(*unsafe.Pointer)(unsafe.Pointer(&(t.head))),
-			unsafe.Pointer(t.head),
+			unsafe.Pointer(node),
 			unsafe.Pointer(nextNode),
 		)
 	}
-}
-
-func getGID() uint64 {
-	/*
-		For debugging only! Delete once finished
-	*/
-	b := make([]byte, 64)
-	b = b[:runtime.Stack(b, false)]
-	b = bytes.TrimPrefix(b, []byte("goroutine "))
-	b = b[:bytes.IndexByte(b, ' ')]
-	n, _ := strconv.ParseUint(string(b), 10, 64)
-	return n
 }
 
 func (t *ThreadSafeList) DeleteObject(object unsafe.Pointer) (success bool) {
@@ -292,17 +277,20 @@ func (t ThreadSafeList) Peek() unsafe.Pointer {
 	return t.head.object
 }
 
-func (t *ThreadSafeList) PopFirst() unsafe.Pointer {
-	// TODO add tests
+func (t *ThreadSafeList) PopFirst(failAddress unsafe.Pointer) unsafe.Pointer {
+	// TODO explore performance benefits of not using recursion
 	currentHead := t.head
 	if currentHead == nil {
-		return nil
+		return failAddress
+	} else if currentHead.markableNext.marked {
+		t.hardDeleteNode(nil, currentHead)
+		return t.PopFirst(failAddress)
 	}
 	operationSucceeded := t.deleteNode(nil, currentHead)
 	if operationSucceeded {
 		return currentHead.object
 	}
-	return t.PopFirst()
+	return t.PopFirst(failAddress)
 }
 
 func (t ThreadSafeList) Iter() <-chan unsafe.Pointer {

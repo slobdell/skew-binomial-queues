@@ -371,9 +371,6 @@ func (q SkewBinomialQueue) Length() int {
 	if q.rightSibling == nil || q.rightSibling.heapHead.IsEmpty() {
 		return q.heapHead.Length()
 	}
-	val1 := q.heapHead.Length()
-	val2 := q.rightSibling.Length()
-	return val1 + val2
 	return q.heapHead.Length() + q.rightSibling.Length()
 }
 

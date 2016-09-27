@@ -185,6 +185,33 @@ func TestListInsertObject(t *testing.T) {
 	}
 }
 
+func TestPopFirst(t *testing.T) {
+
+	list := skewBinomialQ.ThreadSafeList{}
+
+	// test empty
+	failAddress := unsafe.Pointer(new(int))
+
+	result := list.PopFirst(failAddress)
+	if result != failAddress {
+		t.Error("Failure for empty case, should have gotten fail address")
+	}
+
+	items := []int64{30, 10, 2, 4, 17, 20}
+
+	for _, item := range items {
+		newlyAllocatedItem := item
+		list.InsertObject(unsafe.Pointer(&newlyAllocatedItem), int64LessThan)
+	}
+
+	result = list.PopFirst(unsafe.Pointer(failAddress))
+	poppedValue := *(*int64)(result)
+
+	if poppedValue != 2 {
+		t.Error("Unexpected value for popped head", poppedValue)
+	}
+}
+
 func TestPopNth(t *testing.T) {
 	list := skewBinomialQ.ThreadSafeList{}
 
@@ -424,7 +451,7 @@ func TestSpeedFreeList(t *testing.T) {
 	}
 
 	var randomNumbers []int
-	sampleSize := 1000000
+	sampleSize := 1000
 	//var seed int64 = 10
 	//r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
@@ -442,35 +469,53 @@ func TestSpeedFreeList(t *testing.T) {
 			IntegerQueuePriority{number},
 		)
 	}
+	fmt.Printf("Enqueued %d total items\n", len(randomNumbers))
 	fmt.Printf("ALL DONE HERE\n")
-	return
+
+	// SBL for some reason if there are no pending operations that's when
+	// things seem to be in a bad state
+	//(q.(skewBinomialQ.LazyMergeSkewBinomialQueue)).BlockUntilNoPending()
 
 	dequeueCount := 0
 	var priority skewBinomialQ.QueuePriority
 	for {
 		priority, q = q.Dequeue()
-		//fmt.Printf("Dequeued object: %s\n", priority)
-		something, ok := priority.(IntegerQueuePriority)
-
-		_, ahfuck := priority.(skewBinomialQ.BootstrappedSkewBinomialQueue)
-		if ahfuck {
-			panic("DAMMIT, BOOTSTRAPPED SKEWS ARE BEING INSERTED INTO OTHER BOOTSTRAPPED SKEWS")
-		}
+		intPriority, ok := priority.(IntegerQueuePriority)
 		if ok {
-			// successful dequeue
 			dequeueCount++
+			fmt.Printf("Value of int is %s\n", intPriority)
 		} else {
-			fmt.Printf("Value of something was %s\n", something)
-			fmt.Printf("Stopping after dequeueing %d items\n", dequeueCount)
-			// reached empty queue
 			break
 		}
 	}
-	time.Sleep(1 * time.Second)
-	fmt.Printf("TRYING TO DEQ again\n")
-	priority, q = q.Dequeue()
-	_, ok := priority.(IntegerQueuePriority)
-	if ok {
-		fmt.Printf("YOU SUCK AT PROGRAMMING\n")
-	}
+	fmt.Printf("Dequeued %d total items\n", dequeueCount)
+	/*
+		var priority skewBinomialQ.QueuePriority
+		for {
+			priority, q = q.Dequeue()
+			//fmt.Printf("Dequeued object: %s\n", priority)
+			something, ok := priority.(IntegerQueuePriority)
+
+			_, ahfuck := priority.(skewBinomialQ.BootstrappedSkewBinomialQueue)
+			if ahfuck {
+				panic("DAMMIT, BOOTSTRAPPED SKEWS ARE BEING INSERTED INTO OTHER BOOTSTRAPPED SKEWS")
+			}
+			if ok {
+				// successful dequeue
+				dequeueCount++
+			} else {
+				fmt.Printf("Value of something was %s\n", something)
+				fmt.Printf("Stopping after dequeueing %d items\n", dequeueCount)
+				// reached empty queue
+				break
+			}
+		}
+		time.Sleep(1 * time.Second)
+		fmt.Printf("TRYING TO DEQ again\n")
+		priority, q = q.Dequeue()
+		_, ok := priority.(IntegerQueuePriority)
+		if ok {
+			fmt.Printf("YOU SUCK AT PROGRAMMING\n")
+		}
+	*/
 }
