@@ -1,7 +1,6 @@
 package skewBinomialQ
 
 import (
-	//"fmt"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -76,9 +75,17 @@ func (q LazyMergeSkewBinomialQueue) IncrOpsCount() {
 }
 
 func (q LazyMergeSkewBinomialQueue) DecrOpsCount() {
-	//fmt.Printf("BEFORE Pending ops: %d\n", *(q.pendingOpsCount))
 	atomic.AddInt32(q.pendingOpsCount, -1)
-	//fmt.Printf("AFTER Pending ops: %d\n\n", *(q.pendingOpsCount))
+}
+
+func (q LazyMergeSkewBinomialQueue) blockUntilNoPending() {
+	for {
+		currentValue := *(q.pendingOpsCount)
+		if currentValue == 0 {
+			break
+		}
+		time.Sleep(0)
+	}
 }
 
 func (q LazyMergeSkewBinomialQueue) Enqueue(priority QueuePriority) PriorityQueue {
@@ -100,10 +107,8 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 	defer q.DecrOpsCount()
 	queuesToFetch := 2
 	if !q.freeQueueList.LengthGreaterThan(MaxParallelism() + (queuesToFetch - 1)) {
-		//fmt.Printf("returning prematurely\n")
 		return
 	}
-	//fmt.Printf("LETS DO THIS\n")
 
 	var queues []unsafe.Pointer
 	failAddress := new(int8)
@@ -113,7 +118,6 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 		counter++
 		// return current list of queues into the list
 		if (*int8)(poppedQ) == failAddress {
-			//fmt.Printf("Failed to pop, re-inserting\n")
 			for _, queuePtr := range queues {
 				q.freeQueueList.InsertObject(queuePtr, qLessThanOther)
 			}
@@ -121,12 +125,10 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 		}
 		queues = append(queues, poppedQ)
 		time.Sleep(0)
-		//fmt.Printf("spinning case 9\n")
 	}
 	q1 := *((*BootstrappedSkewBinomialQueue)(queues[0]))
 	q2 := *((*BootstrappedSkewBinomialQueue)(queues[1]))
 	finalQ := (q1.Meld(q2))
-	//fmt.Printf("SUCCEEDED IN MERGING\n")
 	q.freeQueueList.InsertObject(
 		unsafe.Pointer(&finalQ),
 		qLessThanOther,

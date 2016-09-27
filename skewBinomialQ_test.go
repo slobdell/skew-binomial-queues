@@ -256,45 +256,6 @@ func TestListDeleteObject(t *testing.T) {
 	}
 }
 
-func TestSplitLastN(t *testing.T) {
-	// TODO I think I want to delete SplitLastN
-	return
-	list := skewBinomialQ.ThreadSafeList{}
-	items := []int64{2, 4, 5, 10, 17, 20, 30}
-
-	for _, item := range items {
-		newlyAllocatedItem := item
-		list.InsertObject(unsafe.Pointer(&newlyAllocatedItem), int64LessThan)
-	}
-	returnedObjects := list.TrySplitLastN(
-		skewBinomialQ.TrySplitParameter{
-			N: 3,
-		},
-	)
-	intReturnedObjects := []int64{}
-	for _, ptr := range returnedObjects {
-		intReturnedObjects = append(intReturnedObjects, *(*int64)(ptr))
-	}
-
-	expectedMutation := []int64{2, 4, 5, 10}
-	var sortedItems []int64
-	for sortedItem := range list.Iter() {
-		sortedItems = append(sortedItems, *(*int64)(sortedItem))
-	}
-	for index := range sortedItems {
-		if sortedItems[index] != expectedMutation[index] {
-			t.Error("Values not equal")
-		}
-	}
-
-	expectedReturnedObjects := []int64{30, 20, 17}
-	for index := range intReturnedObjects {
-		if intReturnedObjects[index] != expectedReturnedObjects[index] {
-			t.Error("Values not equal")
-		}
-	}
-}
-
 func TestListCounter(t *testing.T) {
 	list := skewBinomialQ.ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
@@ -463,7 +424,7 @@ func TestSpeedFreeList(t *testing.T) {
 	}
 
 	var randomNumbers []int
-	sampleSize := 100000
+	sampleSize := 1000000
 	//var seed int64 = 10
 	//r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
