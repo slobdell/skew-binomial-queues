@@ -2,6 +2,7 @@ package skewBinomialQ
 
 import (
 	"bytes"
+	//"fmt"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -31,10 +32,6 @@ func MaxParallelism() int {
 		*cachedMaxParallelism = returnValue
 	}
 	return returnValue
-}
-
-func skewQToBootstrappedQ(q SkewBinomialQueue) BootstrappedSkewBinomialQueue {
-	panic("use the new function I wrote like a badass")
 }
 
 func qLessThanOther(q1 unsafe.Pointer, q2 unsafe.Pointer) bool {
@@ -211,6 +208,7 @@ func getGID() uint64 {
 }
 
 func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
+	// fmt.Printf("current count of list: %d\n", q.freeQueueList.Count())
 	var qPtr unsafe.Pointer = FAIL_ADDRESS
 
 	for {
@@ -234,23 +232,63 @@ func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
 		}
 		return nil, q
 	}
-	/*
-		queuePriority, remainingBootstrappedQ := bootstrappedQ.DequeueWithCallback(
-			// TODO FIX THIS SHIT
-			//q.dequeueCallback,
-			bootstrappedQ.priorityQueue.dequeueCallback,
-		)
-	*/
-	queuePriority, remainingBootstrappedQ := bootstrappedQ.Dequeue()
+	queuePriority, remainingBootstrappedQ := bootstrappedQ.DequeueWithMergeCallback(
+		q.lazyMergeCallback,
+	)
+	// queuePriority, remainingBootstrappedQ := bootstrappedQ.Dequeue()
 
 	q.startInsert(remainingBootstrappedQ)
 	defer q.decrLength()
 	return queuePriority, q
 }
 
+func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
+	passThruQueuePtr := remainingQueues[0]
+	passThruQ := *passThruQueuePtr
+	var validSkewQs []SkewBinomialQueue
+
+	for _, skewQ := range remainingQueues[1:] {
+		newlyAllocatedItem := skewQ
+		validSkewQs = append(validSkewQs, *newlyAllocatedItem)
+	}
+	var prioritiesRankZero []QueuePriority
+	for _, child := range childNodes {
+		if child.Rank() > 0 {
+			validQ := newSkewBinomialQueue(
+				child,
+				nil,
+			)
+			validSkewQs = append(validSkewQs, validQ)
+		} else {
+			prioritiesRankZero = append(
+				prioritiesRankZero,
+				child.Peek(),
+			)
+		}
+	}
+	freshQ := NewEmptySkewBinomialQueue().bulkInsert(prioritiesRankZero...)
+	q.startInsertSkew(freshQ)
+	for _, skewQ := range validSkewQs {
+		q.startInsertSkew(skewQ)
+	}
+	q.startMeldFreeQueues()
+	return passThruQ
+}
+
 func (q LazyMergeSkewBinomialQueue) startInsert(bootstrappedQ BootstrappedSkewBinomialQueue) {
 	q.incrOpsCount()
 	go q.asyncInsert(bootstrappedQ)
+}
+
+func (q LazyMergeSkewBinomialQueue) startInsertSkew(skewQ SkewBinomialQueue) {
+	q.incrOpsCount()
+	go q.asyncInsertSkew(skewQ)
+}
+
+func (q LazyMergeSkewBinomialQueue) asyncInsertSkew(skewQ SkewBinomialQueue) {
+	q.asyncInsert(
+		skewQToBootstrappedQ(skewQ),
+	)
 }
 
 func (q LazyMergeSkewBinomialQueue) asyncInsert(bootstrappedQ BootstrappedSkewBinomialQueue) {
@@ -305,7 +343,7 @@ func (q LazyMergeSkewBinomialQueue) asyncDequeueCallback(childNodes []Node, rema
 			)
 		}
 	}
-	lastQ := NewEmptySkewBinomialQueue().bulkInsert(prioritiesRankZero...)
-	q.startTransformAndInsert(lastQ)
+	freshQ := NewEmptySkewBinomialQueue().bulkInsert(prioritiesRankZero...)
+	q.startTransformAndInsert(freshQ)
 	q.startMeldFreeQueues()
 }

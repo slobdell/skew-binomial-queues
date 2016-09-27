@@ -451,7 +451,7 @@ func TestSpeedFreeList(t *testing.T) {
 	}
 
 	var randomNumbers []int
-	sampleSize := 1000
+	sampleSize := 1000000
 	//var seed int64 = 10
 	//r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
@@ -480,10 +480,10 @@ func TestSpeedFreeList(t *testing.T) {
 	var priority skewBinomialQ.QueuePriority
 	for {
 		priority, q = q.Dequeue()
-		intPriority, ok := priority.(IntegerQueuePriority)
+		_, ok := priority.(IntegerQueuePriority)
 		if ok {
 			dequeueCount++
-			fmt.Printf("Value of int is %s\n", intPriority)
+			//fmt.Printf("Value of int is %s\n", intPriority)
 		} else {
 			break
 		}

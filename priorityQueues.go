@@ -551,7 +551,7 @@ func (b BootstrappedSkewBinomialQueue) DequeueWithMergeCallback(mergeCallback fu
 	updatedBootstrappedQueue := BootstrappedSkewBinomialQueue{
 		highestPriorityObject: highestPriorityBootstrappedQueue.highestPriorityObject,
 		priorityQueue:         &mergedPrimitiveQ,
-		length:                b.Length() - 1, // TODO this no longer works w callback
+		length:                b.Length() - 1, // FIXME this no longer works w callback, value is wrong
 	}
 	return b.highestPriorityObject, updatedBootstrappedQueue
 }
@@ -644,19 +644,20 @@ func (b BootstrappedSkewBinomialQueue) crazyMergeCallback(childNodes []Node, rem
 		lastQ = lastQ.Meld(skewQ).(SkewBinomialQueue)
 	}
 	something := passThruQ.Meld(lastQ).(SkewBinomialQueue)
-	skewQToBootstrappedQV2(something)
+	skewQToBootstrappedQ(something)
 	// END CRAZY IDEA
 
 	return passThruQ
 }
 
 func (b BootstrappedSkewBinomialQueue) CrazyDequeue() (QueuePriority, BootstrappedSkewBinomialQueue) {
+	fmt.Printf("Value of self: %s\n", b)
 	return b.DequeueWithMergeCallback(
 		b.crazyMergeCallback,
 	)
 }
 
-func skewQToBootstrappedQV2(q SkewBinomialQueue) BootstrappedSkewBinomialQueue {
+func skewQToBootstrappedQ(q SkewBinomialQueue) BootstrappedSkewBinomialQueue {
 	if q.IsEmpty() {
 		return NewEmptyBootstrappedSkewBinomialQueue()
 	}
