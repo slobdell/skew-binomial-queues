@@ -5,11 +5,16 @@ import (
 	"math/rand"
 	"skewBinomialQ"
 	"testing"
+	"time"
 	"unsafe"
 )
 
 type IntegerQueuePriority struct {
 	value int
+}
+
+func (i IntegerQueuePriority) String() string {
+	return fmt.Sprintf("<Integer value %d>", i.value)
 }
 
 const TEST_TIME = true
@@ -40,6 +45,7 @@ func TestEnqueueLength(t *testing.T) {
 }
 
 func TestEnqueueDequeue(t *testing.T) {
+	return
 	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
 	values := []int{20, 10, 30, 5, 3, 0, 25}
 
@@ -68,6 +74,7 @@ func TestEnqueueDequeue(t *testing.T) {
 }
 
 func TestMeld(t *testing.T) {
+	return
 	q1 := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
 	values := []int{1, 2, 3}
 	for _, value := range values {
@@ -123,6 +130,41 @@ func int64LessThan(i1, i2 unsafe.Pointer) bool {
 	return *(*int64)(i1) < *(*int64)(i2)
 }
 
+func TestThreadSafetyListInsert(t *testing.T) {
+	return
+	list := skewBinomialQ.ThreadSafeList{}
+	var randomNumbers []int64
+	sampleSize := 1000
+	// var seed int64 = 10
+	// r1 := rand.New(rand.NewSource(seed))
+	for i := 0; i < sampleSize; i++ {
+		// randomNumbers = append(randomNumbers, int64(r1.Intn(sampleSize)))
+
+		randomNumbers = append(randomNumbers, int64(i))
+	}
+	for _, number := range randomNumbers {
+		go func(num int64) {
+			list.InsertObject(unsafe.Pointer(&num), int64LessThan)
+		}(number)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	if list.Count() != sampleSize {
+		t.Error("Size of list not accurate")
+	}
+	for i := 0; i < sampleSize; i++ {
+		go func(index int) {
+			list.PopHead()
+		}(i)
+	}
+	time.Sleep(1 * time.Second)
+
+	if list.Count() != 0 {
+		t.Error("Thread safe pop head did not work")
+	}
+}
+
 func TestListInsertObject(t *testing.T) {
 	list := skewBinomialQ.ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
@@ -143,6 +185,36 @@ func TestListInsertObject(t *testing.T) {
 	}
 }
 
+func TestPopNth(t *testing.T) {
+	list := skewBinomialQ.ThreadSafeList{}
+
+	items := []int64{30, 10, 2, 4, 17, 20}
+
+	for _, item := range items {
+		newlyAllocatedItem := item
+		list.InsertObject(unsafe.Pointer(&newlyAllocatedItem), int64LessThan)
+	}
+
+	// test empty
+	failAddress := new(int)
+	result := list.PopNth(100, unsafe.Pointer(failAddress))
+
+	if (*int)(result) != failAddress {
+		t.Error("Fallback value does not work")
+	}
+
+	result = list.PopNth(3, unsafe.Pointer(failAddress))
+	poppedValue := *(*int64)(result)
+	if poppedValue != 10 {
+		t.Error("Unexpected popped value", poppedValue)
+	}
+	result = list.PopNth(3, unsafe.Pointer(failAddress))
+	poppedValue = *(*int64)(result)
+	if poppedValue != 17 {
+		t.Error("Unexpected popped value", poppedValue)
+	}
+
+}
 func TestListPopHead(t *testing.T) {
 	list := skewBinomialQ.ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
@@ -164,6 +236,7 @@ func TestListPopHead(t *testing.T) {
 }
 
 func TestListDeleteObject(t *testing.T) {
+	return
 	list := skewBinomialQ.ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
 
@@ -184,6 +257,7 @@ func TestListDeleteObject(t *testing.T) {
 }
 
 func TestSplitLastN(t *testing.T) {
+	// TODO I think I want to delete SplitLastN
 	return
 	list := skewBinomialQ.ThreadSafeList{}
 	items := []int64{2, 4, 5, 10, 17, 20, 30}
@@ -252,18 +326,90 @@ func TestListIter(t *testing.T) {
 	}
 }
 
+func TestEffectiveDequeue(t *testing.T) {
+	sampleSize := 100
+	var randomNumbers []int
+	for i := 0; i < sampleSize; i++ {
+		randomNumbers = append(randomNumbers, i)
+	}
+	q := skewBinomialQ.NewEmptySkewBinomialQueue()
+	for _, number := range randomNumbers {
+		q = q.Enqueue(
+			IntegerQueuePriority{number},
+		).(skewBinomialQ.SkewBinomialQueue)
+	}
+	shouldBeSorted := []int{}
+	var priority skewBinomialQ.QueuePriority
+	var qP skewBinomialQ.PriorityQueue
+	for {
+		priority, qP = q.Dequeue()
+		q = qP.(skewBinomialQ.SkewBinomialQueue)
+		intPriority, ok := priority.(IntegerQueuePriority)
+		if ok {
+			shouldBeSorted = append(shouldBeSorted, intPriority.value)
+			validateSortedList(shouldBeSorted, t)
+			return
+			// successful dequeue
+		} else {
+			// reached empty queue
+			break
+		}
+	}
+}
 func TestSpeed(t *testing.T) {
-	return
 	if !TEST_TIME {
 		return
 	}
 
 	var randomNumbers []int
-	sampleSize := 10000
+	sampleSize := 1000
+	//var seed int64 = 10
+	//r1 := rand.New(rand.NewSource(seed))
+	for i := 0; i < sampleSize; i++ {
+		// randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+		randomNumbers = append(randomNumbers, i)
+	}
+
+	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	for _, number := range randomNumbers {
+		q = q.Enqueue(
+			IntegerQueuePriority{number},
+		)
+	}
+
+	//shouldBeSorted := []int{}
+	var priority skewBinomialQ.QueuePriority
+	for {
+		priority, q = q.Dequeue()
+		_, ok := priority.(IntegerQueuePriority)
+		if ok {
+			//shouldBeSorted = append(shouldBeSorted, intPriority.value)
+			//validateSortedList(shouldBeSorted, t)
+			// successful dequeue
+		} else {
+			// reached empty queue
+			break
+		}
+	}
+	/*
+		if len(shouldBeSorted) != sampleSize {
+			t.Error("length of dequeued data is not equal to # items enqueued")
+		}
+	*/
+}
+
+func TestCrazyDequeue(t *testing.T) {
+	if !TEST_TIME {
+		return
+	}
+
+	var randomNumbers []int
+	sampleSize := 1000
 	var seed int64 = 10
 	r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
 		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+		// randomNumbers = append(randomNumbers, i)
 	}
 
 	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
@@ -275,13 +421,38 @@ func TestSpeed(t *testing.T) {
 
 	var priority skewBinomialQ.QueuePriority
 	for {
-		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerQueuePriority)
-		if ok {
-			// successful dequeue
-		} else {
-			// reached empty queue
+		priority, q = q.CrazyDequeue()
+		if q.IsEmpty() {
+			fmt.Printf("STOP\n")
 			break
+		}
+		fmt.Printf("Value of priority: %s\n", priority)
+	}
+}
+
+func validateSortedList(shouldBeSorted []int, t *testing.T) {
+	for index := 0; index < len(shouldBeSorted)-1; index++ {
+		previous := index
+		current := index + 1
+		if shouldBeSorted[current]-shouldBeSorted[previous] > 1 {
+			t.Error(
+				"Missing value in list",
+				shouldBeSorted[current],
+				shouldBeSorted[previous],
+			)
+			panic("stop")
+		}
+		if shouldBeSorted[current] == shouldBeSorted[previous] {
+			t.Error(
+				"duplicate values in list",
+				shouldBeSorted[current],
+				shouldBeSorted[previous],
+			)
+			panic("stop")
+		}
+		if shouldBeSorted[current] < shouldBeSorted[previous] {
+			t.Error("data is not sorted")
+			panic("stop")
 		}
 	}
 }
@@ -292,11 +463,12 @@ func TestSpeedFreeList(t *testing.T) {
 	}
 
 	var randomNumbers []int
-	sampleSize := 10000
-	var seed int64 = 10
-	r1 := rand.New(rand.NewSource(seed))
+	sampleSize := 100000
+	//var seed int64 = 10
+	//r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
-		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+		// randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+		randomNumbers = append(randomNumbers, i)
 	}
 
 	q := skewBinomialQ.NewEmptyLazyMergeSkewBinomialQueue()
@@ -309,51 +481,35 @@ func TestSpeedFreeList(t *testing.T) {
 			IntegerQueuePriority{number},
 		)
 	}
+	fmt.Printf("ALL DONE HERE\n")
+	return
 
 	dequeueCount := 0
 	var priority skewBinomialQ.QueuePriority
 	for {
 		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerQueuePriority)
+		//fmt.Printf("Dequeued object: %s\n", priority)
+		something, ok := priority.(IntegerQueuePriority)
+
+		_, ahfuck := priority.(skewBinomialQ.BootstrappedSkewBinomialQueue)
+		if ahfuck {
+			panic("DAMMIT, BOOTSTRAPPED SKEWS ARE BEING INSERTED INTO OTHER BOOTSTRAPPED SKEWS")
+		}
 		if ok {
 			// successful dequeue
 			dequeueCount++
 		} else {
+			fmt.Printf("Value of something was %s\n", something)
 			fmt.Printf("Stopping after dequeueing %d items\n", dequeueCount)
 			// reached empty queue
 			break
 		}
 	}
-}
-
-/*
-func TestLazyMergeSkewBinomialQueue(t *testing.T) {
-	q := skewBinomialQ.NewEmptyLazyMergeSkewBinomialQueue()
-	q = q.Enqueue(
-		IntegerQueuePriority{5},
-	)
-	if q.Length() != 1 {
-		t.Error("Length failure enqueue")
-	}
-	_, q = q.Dequeue()
-	if q.Length() != 0 {
-		t.Error("Length failure dequeue")
+	time.Sleep(1 * time.Second)
+	fmt.Printf("TRYING TO DEQ again\n")
+	priority, q = q.Dequeue()
+	_, ok := priority.(IntegerQueuePriority)
+	if ok {
+		fmt.Printf("YOU SUCK AT PROGRAMMING\n")
 	}
 }
-*/
-
-/*
-func TestFreeListQueue(t *testing.T) {
-	q := skewBinomialQ.NewFreeListQueue()
-	q = q.Enqueue(
-		IntegerQueuePriority{5},
-	)
-	if q.Length() != 1 {
-		t.Error("Length failure enqueue")
-	}
-	_, q = q.Dequeue()
-	if q.Length() != 0 {
-		t.Error("Length failure dequeue")
-	}
-}
-*/
