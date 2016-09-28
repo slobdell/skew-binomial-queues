@@ -172,7 +172,7 @@ func (q LazyMergeSkewBinomialQueue) Peek() QueuePriority {
 }
 
 func (q LazyMergeSkewBinomialQueue) Meld(otherQ PriorityQueue) PriorityQueue {
-	panic("TEMP")
+	panic("do not use until we have test coverage")
 	otherLazyQ := otherQ.(LazyMergeSkewBinomialQueue)
 	otherList := otherLazyQ.freeQueueList
 	for {
@@ -305,13 +305,6 @@ func (q LazyMergeSkewBinomialQueue) asyncInsert(bootstrappedQ BootstrappedSkewBi
 	)
 }
 
-func (q LazyMergeSkewBinomialQueue) dequeueCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
-	panic("ALSO NOT YET")
-	q.incrOpsCount()
-	go q.asyncDequeueCallback(childNodes, remainingQueues[1:]...)
-	return *(remainingQueues[0])
-}
-
 func (q LazyMergeSkewBinomialQueue) transformAndInsert(skewQ SkewBinomialQueue) {
 	defer q.decrOpsCount()
 	bootstrappedQ := skewQToBootstrappedQ(skewQ)
@@ -319,37 +312,4 @@ func (q LazyMergeSkewBinomialQueue) transformAndInsert(skewQ SkewBinomialQueue) 
 		unsafe.Pointer(&bootstrappedQ),
 		qLessThanOther,
 	)
-}
-
-func (q LazyMergeSkewBinomialQueue) startTransformAndInsert(skewQ SkewBinomialQueue) {
-	panic("NOT YET")
-	q.incrOpsCount()
-	go q.transformAndInsert(skewQ)
-}
-
-func (q LazyMergeSkewBinomialQueue) asyncDequeueCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) {
-	defer q.decrOpsCount()
-	panic("NOT READY FOR THIS YET")
-	for _, skewQ := range remainingQueues {
-		q.startTransformAndInsert(*skewQ)
-	}
-
-	var prioritiesRankZero []QueuePriority
-	for _, child := range childNodes {
-		if child.Rank() > 0 {
-			validQ := newSkewBinomialQueue(
-				child,
-				nil,
-			)
-			q.startTransformAndInsert(validQ)
-		} else {
-			prioritiesRankZero = append(
-				prioritiesRankZero,
-				child.Peek(),
-			)
-		}
-	}
-	freshQ := NewEmptySkewBinomialQueue().bulkInsert(prioritiesRankZero...)
-	q.startTransformAndInsert(freshQ)
-	q.startMeldFreeQueues()
 }
