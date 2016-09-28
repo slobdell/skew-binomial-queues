@@ -2,7 +2,7 @@ package skewBinomialQ_test
 
 import (
 	"fmt"
-	"math/rand"
+	//"math/rand"
 	"skewBinomialQ"
 	"testing"
 	"time"
@@ -384,38 +384,6 @@ func TestSpeed(t *testing.T) {
 			t.Error("length of dequeued data is not equal to # items enqueued")
 		}
 	*/
-}
-
-func TestCrazyDequeue(t *testing.T) {
-	if !TEST_TIME {
-		return
-	}
-
-	var randomNumbers []int
-	sampleSize := 1000
-	var seed int64 = 10
-	r1 := rand.New(rand.NewSource(seed))
-	for i := 0; i < sampleSize; i++ {
-		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
-		// randomNumbers = append(randomNumbers, i)
-	}
-
-	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
-	for _, number := range randomNumbers {
-		q = q.Enqueue(
-			IntegerQueuePriority{number},
-		)
-	}
-
-	var priority skewBinomialQ.QueuePriority
-	for {
-		priority, q = q.CrazyDequeue()
-		if q.IsEmpty() {
-			fmt.Printf("STOP\n")
-			break
-		}
-		fmt.Printf("Value of priority: %s\n", priority)
-	}
 }
 
 func validateSortedList(shouldBeSorted []int, t *testing.T) {

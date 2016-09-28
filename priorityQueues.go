@@ -5,6 +5,15 @@ import (
 	"sort"
 )
 
+//5,180,022
+var skewHeapCount *int32 = new(int32)
+
+// 1,4595,392
+var skewQueueCount *int32 = new(int32)
+
+// 6,526,797
+var bootstrappedQueueCount *int32 = new(int32)
+
 type QueuePriority interface {
 	LessThan(otherPriority QueuePriority) bool
 }
@@ -578,6 +587,7 @@ func (b BootstrappedSkewBinomialQueue) Meld(otherQ BootstrappedSkewBinomialQueue
 	primitiveQueue := otherQ.priorityQueue.Enqueue(
 		b,
 	).(SkewBinomialQueue)
+
 	return BootstrappedSkewBinomialQueue{
 		highestPriorityObject: otherQ.Peek(),
 		priorityQueue:         &primitiveQueue,
@@ -596,65 +606,6 @@ func (b BootstrappedSkewBinomialQueue) LessThan(otherPriority QueuePriority) boo
 		return b.Peek().LessThan(otherQ.Peek())
 	}
 	return false
-}
-
-func (b BootstrappedSkewBinomialQueue) Repr() {
-	fmt.Printf("Value of self: %s\n", b)
-	fmt.Printf("Value of highest priority obj: %s\n", b.highestPriorityObject)
-	fmt.Printf("Value of primitive Q: %s\n", b.priorityQueue)
-	fmt.Printf("Value of primitive Q Peek: %s\n", b.priorityQueue.Peek())
-}
-
-func (b BootstrappedSkewBinomialQueue) crazyMergeCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
-	/* WORK IN PROGRESS:  Idea here is to reconstruct bootstrapped skew binomial queues
-	from skew binomial queues.
-
-	the idea is to set it up so that deferring Meld() operations can be done
-
-	*/
-
-	// idea would be to just return this, and then take the remaining shits and meld them
-	// into the current shit
-	passThruQueuePtr := remainingQueues[0]
-	passThruQ := *passThruQueuePtr
-	var validSkewQs []SkewBinomialQueue
-
-	for _, skewQ := range remainingQueues[1:] {
-		newlyAllocatedItem := skewQ
-		validSkewQs = append(validSkewQs, *newlyAllocatedItem)
-	}
-	var prioritiesRankZero []QueuePriority
-	for _, child := range childNodes {
-		if child.Rank() > 0 {
-			validQ := newSkewBinomialQueue(
-				child,
-				nil,
-			)
-			validSkewQs = append(validSkewQs, validQ)
-		} else {
-			prioritiesRankZero = append(
-				prioritiesRankZero,
-				child.Peek(),
-			)
-		}
-	}
-	lastQ := NewEmptySkewBinomialQueue().bulkInsert(prioritiesRankZero...)
-	// IDEA WILL BE TO REFER THESE OPERATIONS
-	for _, skewQ := range validSkewQs {
-		lastQ = lastQ.Meld(skewQ).(SkewBinomialQueue)
-	}
-	something := passThruQ.Meld(lastQ).(SkewBinomialQueue)
-	skewQToBootstrappedQ(something)
-	// END CRAZY IDEA
-
-	return passThruQ
-}
-
-func (b BootstrappedSkewBinomialQueue) CrazyDequeue() (QueuePriority, BootstrappedSkewBinomialQueue) {
-	fmt.Printf("Value of self: %s\n", b)
-	return b.DequeueWithMergeCallback(
-		b.crazyMergeCallback,
-	)
 }
 
 func skewQToBootstrappedQ(q SkewBinomialQueue) BootstrappedSkewBinomialQueue {

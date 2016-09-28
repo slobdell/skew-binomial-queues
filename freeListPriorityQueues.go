@@ -15,6 +15,8 @@ var cachedMaxParallelism *int
 
 var FAIL_ADDRESS unsafe.Pointer = unsafe.Pointer(new(int8))
 
+const MELD_PERIOD = 2
+
 func MaxParallelism() int {
 	if cachedMaxParallelism != nil {
 		return *cachedMaxParallelism
@@ -54,6 +56,7 @@ type LazyMergeSkewBinomialQueue struct {
 	freeQueueList   *ThreadSafeList
 	pendingOpsCount *int32
 	length          *int64
+	meldCounter     *int32
 }
 
 func NewEmptyLazyMergeSkewBinomialQueue() PriorityQueue {
@@ -68,8 +71,8 @@ func NewEmptyLazyMergeSkewBinomialQueue() PriorityQueue {
 		freeQueueList:   &threadSafeList,
 		pendingOpsCount: new(int32),
 		length:          new(int64),
+		meldCounter:     new(int32),
 	}
-	*(lazyQ.pendingOpsCount) = 0
 	return lazyQ
 }
 
@@ -111,6 +114,9 @@ func (q LazyMergeSkewBinomialQueue) Enqueue(priority QueuePriority) PriorityQueu
 }
 
 func (q LazyMergeSkewBinomialQueue) startMeldFreeQueues() {
+	if atomic.AddInt32(q.meldCounter, 1)%MELD_PERIOD != 0 {
+		return
+	}
 	q.incrOpsCount()
 	go q.meldFreeQueues()
 }
