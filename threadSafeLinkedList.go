@@ -61,7 +61,6 @@ func (t *ThreadSafeList) InsertObject(object unsafe.Pointer, lessThanFn func(uns
 	for cursor := t.head; !operationSucceeded; cursor = cursor.markableNext.next {
 		// extra check needed for thread safety
 		if cursor == nil {
-			// SBL BUG HERE
 			t.InsertObject(object, lessThanFn)
 			return
 		}

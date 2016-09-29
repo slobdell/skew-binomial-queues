@@ -2,7 +2,7 @@ package skewBinomialQ_test
 
 import (
 	"fmt"
-	//"math/rand"
+	"math/rand"
 	"skewBinomialQ"
 	"testing"
 	"time"
@@ -419,12 +419,12 @@ func TestSpeedFreeList(t *testing.T) {
 	}
 
 	var randomNumbers []int
-	sampleSize := 1000000
-	//var seed int64 = 10
-	//r1 := rand.New(rand.NewSource(seed))
+	sampleSize := 100000
+	var seed int64 = 10
+	r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
-		// randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
-		randomNumbers = append(randomNumbers, i)
+		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+		//randomNumbers = append(randomNumbers, i)
 	}
 
 	q := skewBinomialQ.NewEmptyLazyMergeSkewBinomialQueue()

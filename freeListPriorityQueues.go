@@ -1,9 +1,7 @@
 package skewBinomialQ
 
 import (
-	"bytes"
 	"runtime"
-	"strconv"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -128,10 +126,8 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 	}
 
 	var queues []unsafe.Pointer
-	counter := 0
 	for len(queues) < queuesToFetch {
 		poppedQ := q.freeQueueList.PopNth(MaxParallelism(), unsafe.Pointer(FAIL_ADDRESS))
-		counter++
 		// return current list of queues into the list
 		if poppedQ == FAIL_ADDRESS {
 			for _, queuePtr := range queues {
@@ -140,7 +136,6 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 			return
 		}
 		queues = append(queues, poppedQ)
-		time.Sleep(0)
 	}
 	q1 := *((*BootstrappedSkewBinomialQueue)(queues[0]))
 	q2 := *((*BootstrappedSkewBinomialQueue)(queues[1]))
@@ -155,6 +150,7 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 }
 
 func (q LazyMergeSkewBinomialQueue) Peek() QueuePriority {
+	panic("do not use until we have test coverage")
 	// TODO unsure if this piece is valid...
 	// TODO not actually valid..
 	var qPtr unsafe.Pointer
@@ -200,20 +196,7 @@ func (q LazyMergeSkewBinomialQueue) IsEmpty() bool {
 	return (*SkewBinomialQueue)(firstQPtr).IsEmpty()
 }
 
-func getGID() uint64 {
-	/*
-		For debugging only! Delete once finished
-	*/
-	b := make([]byte, 64)
-	b = b[:runtime.Stack(b, false)]
-	b = bytes.TrimPrefix(b, []byte("goroutine "))
-	b = b[:bytes.IndexByte(b, ' ')]
-	n, _ := strconv.ParseUint(string(b), 10, 64)
-	return n
-}
-
 func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
-	// fmt.Printf("current count of list: %d\n", q.freeQueueList.Count())
 	var qPtr unsafe.Pointer = FAIL_ADDRESS
 
 	for {
@@ -247,10 +230,8 @@ func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
 }
 
 func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
-	passThruQueuePtr := remainingQueues[0]
-	passThruQ := *passThruQueuePtr
 	q.postDequeue(childNodes, remainingQueues[1:]...)
-	return passThruQ
+	return *(remainingQueues[0])
 }
 
 func (q LazyMergeSkewBinomialQueue) postDequeue(childNodes []Node, remainingQueues ...*SkewBinomialQueue) {

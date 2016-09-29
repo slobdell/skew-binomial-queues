@@ -5,15 +5,6 @@ import (
 	"sort"
 )
 
-//5,180,022
-var skewHeapCount *int32 = new(int32)
-
-// 1,4595,392
-var skewQueueCount *int32 = new(int32)
-
-// 6,526,797
-var bootstrappedQueueCount *int32 = new(int32)
-
 type QueuePriority interface {
 	LessThan(otherPriority QueuePriority) bool
 }
@@ -217,7 +208,6 @@ func (q SkewBinomialQueue) firstTwoTreesEqualRank() bool {
 }
 
 func (q SkewBinomialQueue) Enqueue(priority QueuePriority) PriorityQueue {
-	// SBL ADD A FUNCTION TO WALK WHAT THE PRIORITIES ARE...
 	if q.firstTwoTreesEqualRank() {
 		// null checks should not be necessary here since first two trees are equal
 		return newSkewBinomialQueue(
@@ -496,7 +486,6 @@ func (r RootedSkewBinomialQueue) Length() int {
 }
 
 type BootstrappedSkewBinomialQueue struct {
-	// TODO this thing is going to be super slow because the struct gets really big
 	highestPriorityObject QueuePriority
 	priorityQueue         *SkewBinomialQueue
 	length                int
