@@ -1,2 +1,5 @@
 *.un~
+mem.prof
+cpu.prof
 notes.txt
+skewBinomialQ.test

@@ -451,6 +451,9 @@ func TestSpeedFreeList(t *testing.T) {
 		_, ok := priority.(IntegerQueuePriority)
 		if ok {
 			dequeueCount++
+			if dequeueCount%10000 == 0 {
+				fmt.Printf("dequeued %d items\n", dequeueCount)
+			}
 			//fmt.Printf("Value of int is %s\n", intPriority)
 		} else {
 			break

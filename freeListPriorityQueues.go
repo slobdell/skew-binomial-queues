@@ -2,7 +2,6 @@ package skewBinomialQ
 
 import (
 	"bytes"
-	//"fmt"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -241,7 +240,6 @@ func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
 	queuePriority, remainingBootstrappedQ := bootstrappedQ.DequeueWithMergeCallback(
 		q.lazyMergeCallback,
 	)
-	// queuePriority, remainingBootstrappedQ := bootstrappedQ.Dequeue()
 
 	q.startInsert(remainingBootstrappedQ)
 	defer q.decrLength()
@@ -251,9 +249,14 @@ func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
 func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
 	passThruQueuePtr := remainingQueues[0]
 	passThruQ := *passThruQueuePtr
+	q.postDequeue(childNodes, remainingQueues[1:]...)
+	return passThruQ
+}
+
+func (q LazyMergeSkewBinomialQueue) postDequeue(childNodes []Node, remainingQueues ...*SkewBinomialQueue) {
 	var validSkewQs []SkewBinomialQueue
 
-	for _, skewQ := range remainingQueues[1:] {
+	for _, skewQ := range remainingQueues {
 		newlyAllocatedItem := skewQ
 		validSkewQs = append(validSkewQs, *newlyAllocatedItem)
 	}
@@ -278,7 +281,6 @@ func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remaini
 		q.startInsertSkew(skewQ)
 	}
 	q.startMeldFreeQueues()
-	return passThruQ
 }
 
 func (q LazyMergeSkewBinomialQueue) startInsert(bootstrappedQ BootstrappedSkewBinomialQueue) {
