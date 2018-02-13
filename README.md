@@ -10,7 +10,7 @@ The supported operations and their associated run time complexities are as follo
 #### Length: O(1)
 #### Meld: O(1)
 
-The fundamental advantage of a comparable priority queue datastructure is the ability to meld queues.
+The fundamental advantage of a comparable priority queue datastructure is the ability to meld queues in constant time.
 
 
 ## Usage:
