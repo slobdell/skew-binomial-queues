@@ -1,6 +1,6 @@
 # Thread-Safe Lock Free Priority Queue
 
-The `BootstrappedSkewBinomialQueue` provides the fundamental data structure specific to this repository. It is based on Dr. Chris Okasaki's paper, [Optimal Purely Functional Priority Queues](http://www.brics.dk/RS/96/37/BRICS-RS-96-37.pdf). You can also read [my own blog](http://scottlobdell.me/2016/09/thread-safe-lock-free-priority-queues-golang/) for background, motivation, and analysis of the repository.
+The `BootstrappedSkewBinomialQueue` provides the fundamental synchronous data structure specific to this repository (NOT the purported thread-safe parallelized data structure). It is based on Dr. Chris Okasaki's paper, [Optimal Purely Functional Priority Queues](http://www.brics.dk/RS/96/37/BRICS-RS-96-37.pdf). You can also read [my own blog](http://scottlobdell.me/2016/09/thread-safe-lock-free-priority-queues-golang/) for background, motivation, and analysis of the repository.
 
 The supported operations and their associated run time complexities are as follows:
 
