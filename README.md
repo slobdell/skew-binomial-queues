@@ -4,18 +4,17 @@ The `BootstrappedSkewBinomialQueue` provides the fundamental data structure spec
 
 The supported operations and their associated run time complexities are as follows:
 
-### Enqueue: O(1)
-### Peek: O(1)
-### Dequeue: O(log N)
-### Length: O(1)
-### Meld: O(1)
+#### Enqueue: O(1)
+#### Peek: O(1)
+#### Dequeue: O(log N)
+#### Length: O(1)
+#### Meld: O(1)
 
 The fundamental advantage of a comparable priority queue datastructure is the ability to meld queues.
 
 
 ## Usage:
 ```
-
 type ArbitraryDataType struct {
     ArbitraryData string
     Score         int
