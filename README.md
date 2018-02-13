@@ -10,7 +10,7 @@ The supported operations and their associated run time complexities are as follo
 #### Length: O(1)
 #### Meld: O(1)
 
-The fundamental advantage of a comparable priority queue datastructure is the ability to meld queues in constant time.
+The fundamental advantage over a comparable priority queue datastructure is the ability to meld queues in constant time.
 
 This `BootstrappedSkewBinomialQueue` is also noteworthy in that every operation against the priority queue is copy-on-write. Therefore, any given version of the queue is immutable which can be taken advantage of for particular cases. Operations that imply mutations (Enqueue, Dequeue, and Meld) actually return references to new respective roots in the underlying tree without changing the tree itself.
 
