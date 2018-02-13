@@ -54,6 +54,6 @@ anotherQ := NewEmptyBootstrappedSkewBinomialQueue()
 melded := q1.Meld(anotherQ)
 ```
 
-The library was also an experiment with lock-free datastructures. You can also initialize a `LazyMergeSkewBinomialQueue` in place of a `BootstrappedSkewBinomialQueue`. This datastructure will allow for thread-safe operations, but it will NOT guarantee that the highest priority element is popped in the case that the queue is saturated with dequeues from multiple threads.
+The library was also an experiment with lock-free datastructures. You can also initialize a `LazyMergeSkewBinomialQueue` in place of the synchronous `BootstrappedSkewBinomialQueue`. This datastructure will allow for thread-safe operations, but it will NOT guarantee that the highest priority element is popped in the case that the queue is saturated with dequeues from multiple threads.
 
 As the code currently stands, there are some less than optimal uses of goroutines that need to be cleaned up, so it is unlikely that the concurrent implementation offers significant benefit to any consumers.
