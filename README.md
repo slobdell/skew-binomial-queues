@@ -47,7 +47,7 @@ highestPriorityData := q1.Peek()
 
 
 /**********  DEQUEUE  **********/
-highestPriorityData, ok = q1.Dequeue()
+highestPriorityData, q1 = q1.Dequeue()
 casted, ok := highestPriorityData.(ArbitraryDataType)
 
 
