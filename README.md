@@ -52,7 +52,7 @@ casted, ok := highestPriorityData.(ArbitraryDataType)
 
 
 /**********  MELD  **********/
-anotherQ := NewEmptyBootstrappedSkewBinomialQueue()
+anotherQ := priorityQ.NewImmutableSynchronousQ()
 melded := q1.Meld(anotherQ)
 ```
 
@@ -61,7 +61,7 @@ melded := q1.Meld(anotherQ)
 
 ### Use Cases for the Mutable Parallel Priority Queue
 * Thread safe priority queue
-* Constant time dequeue on the hot path
+* Constant time dequeue on the hot path (fast dequeues are an illusion where tree restructuring occurs in the background after a value is returned to the caller)
 * A relatively high priority element, but not necessarily the highest priority element, is an acceptable value during concurrent dequeue operations
 * Best case constant time meld
 
