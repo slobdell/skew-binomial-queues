@@ -7,6 +7,8 @@ The motivation behind the thread-safe version of the datastructure stemmed from 
 * thread-safe concurrent access is desirable
 * returning the absolute highest priority item in a saturated environment is not necessarily required
 
+It's also worth noting that a skip list would provide a generally comparable implementation of a priority queue, but enqueue() and dequeue() are swapped in terms of run-time complexity between O(1) and O(log N). However, the priority queues implemented here provide the distinct advantage that meld() is supported as a constant time operation, making it ideal for any environment where separate priority queues are routinely merged.
+
 ## API
 For the TLDR, check out [public.go](https://github.com/slobdell/skew-binomial-queues/blob/master/public.go) to understand the access and instantiation patterns of the data structures provided.
 
