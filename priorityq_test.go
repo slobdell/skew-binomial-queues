@@ -18,12 +18,8 @@ func (i IntegerPriorityScorer) String() string {
 
 const TEST_TIME = true
 
-func (i IntegerPriorityScorer) LessThan(otherPriority PriorityScorer) bool {
-	integerPriorityScorer, ok := otherPriority.(IntegerPriorityScorer)
-	if ok {
-		return i.value < integerPriorityScorer.value
-	}
-	return false
+func (i IntegerPriorityScorer) Score() int {
+	return i.value
 }
 
 func TestEnqueueLength(t *testing.T) {

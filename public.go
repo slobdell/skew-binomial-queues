@@ -10,7 +10,7 @@ type PriorityQ interface {
 }
 
 type PriorityScorer interface {
-	LessThan(otherPriority PriorityScorer) bool
+	Score() int
 }
 
 func NewMutableParallelQ() PriorityQ {

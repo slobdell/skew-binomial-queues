@@ -2,6 +2,7 @@ package priorityq
 
 import (
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -15,7 +16,7 @@ var skewQueueCount *int32 = new(int32)
 var bootstrappedQueueCount *int32 = new(int32)
 
 func min(x, y PriorityScorer) PriorityScorer {
-	if x.LessThan(y) {
+	if x.Score() < y.Score() {
 		return x
 	}
 	return y
@@ -84,7 +85,7 @@ type byPriority []node
 
 func (a byPriority) Len() int           { return len(a) }
 func (a byPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byPriority) Less(i, j int) bool { return a[i].Peek().LessThan(a[j].Peek()) }
+func (a byPriority) Less(i, j int) bool { return a[i].Peek().Score() < a[j].Peek().Score() }
 
 func newSkewBinomialHeap(priority PriorityScorer) node {
 	return skewBinomialHeap{
@@ -394,7 +395,7 @@ func (q skewBinomial) popHighestPriorityQ() (skewBinomial, skewBinomial) {
 			),
 			*q.rightSibling
 	}
-	if q.heapHead.Peek().LessThan(q.rightSibling.Peek()) {
+	if q.heapHead.Peek().Score() < q.rightSibling.Peek().Score() {
 		return newSkewBinomial(
 				q.heapHead,
 				nil,
@@ -428,7 +429,7 @@ func (r rootedSkewBinomial) Enqueue(priority PriorityScorer) rootedSkewBinomial 
 			priorityQueue:         newEmptySkewBinomial(),
 		}
 	}
-	if r.highestPriorityObject.LessThan(priority) {
+	if r.highestPriorityObject.Score() < priority.Score() {
 		return rootedSkewBinomial{
 			highestPriorityObject: r.highestPriorityObject,
 			priorityQueue:         r.priorityQueue.Enqueue(priority).(skewBinomial),
@@ -455,7 +456,7 @@ func (r rootedSkewBinomial) Dequeue() (PriorityScorer, rootedSkewBinomial) {
 
 func (r rootedSkewBinomial) Meld(otherQ rootedSkewBinomial) rootedSkewBinomial {
 	mergedPrimitiveQueue := r.priorityQueue.Meld(otherQ.priorityQueue)
-	if r.highestPriorityObject.LessThan(otherQ.highestPriorityObject) {
+	if r.highestPriorityObject.Score() < otherQ.highestPriorityObject.Score() {
 		return rootedSkewBinomial{
 			highestPriorityObject: r.highestPriorityObject,
 			priorityQueue: mergedPrimitiveQueue.Enqueue(
@@ -551,7 +552,7 @@ func (b bootstrappedSkewBinomial) Meld(otherQ bootstrappedSkewBinomial) bootstra
 		return otherQ
 	} else if otherQ.IsEmpty() {
 		return b
-	} else if b.Peek().LessThan(otherQ.Peek()) {
+	} else if b.Peek().Score() < otherQ.Peek().Score() {
 		priorityQueue := b.priorityQueue.Enqueue(
 			otherQ,
 		).(skewBinomial)
@@ -572,21 +573,11 @@ func (b bootstrappedSkewBinomial) Meld(otherQ bootstrappedSkewBinomial) bootstra
 	}
 }
 
-func (b bootstrappedSkewBinomial) LessThan(otherPriority PriorityScorer) bool {
-	otherQ, ok := otherPriority.(bootstrappedSkewBinomial)
-	if ok {
-		if otherQ.IsEmpty() {
-			return true
-		} else if b.IsEmpty() {
-			return false
-		}
-		return b.Peek().LessThan(otherQ.Peek())
-	}
-	return false
-}
-
 func (b bootstrappedSkewBinomial) Score() int {
-	return 0
+	if b.IsEmpty() {
+		return math.MaxInt64
+	}
+	return b.Peek().Score()
 }
 
 func newEmptyBootstrappedSkewBinomial() bootstrappedSkewBinomial {

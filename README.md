@@ -1,37 +1,35 @@
 # Thread-Safe Lock Free Priority Queue
 
-The `BootstrappedSkewBinomialQueue` provides the fundamental synchronous data structure specific to this repository (NOT the purported thread-safe parallelized data structure). It is based on Dr. Chris Okasaki's paper, [Optimal Purely Functional Priority Queues](http://www.brics.dk/RS/96/37/BRICS-RS-96-37.pdf). You can also read [my own blog](http://scottlobdell.me/2016/09/thread-safe-lock-free-priority-queues-golang/) for background, motivation, and analysis of the repository.
+## Background
+This project is based on Dr. Chris Okasaki's paper, [Optimal Purely Functional Priority Queues](http://www.brics.dk/RS/96/37/BRICS-RS-96-37.pdf). You can also read [my own blog](http://scottlobdell.me/2016/09/thread-safe-lock-free-priority-queues-golang/) for background, motivation, and analysis of the repository. The underlying fundamental data structure in this repository is the Bootstrapped Skew Binomial Queue, which is outlined in Dr. Okasaki's paper. At one abstraction level higher, a separate data structure, concisely labeled as a "Parallel Queue", exists that enables thread-safe (and lock free!) concurrent dequeue operations at the cost of sacrificing absolute correctness.
 
-The supported operations and their associated run time complexities are as follows:
+The motivation behind the thread-safe version of the datastructure stemmed from a generally pragmatic use case of priority queues in which:
+* thread-safe concurrent access is desirable
+* returning the absolute highest priority item in a saturated environment is not necessarily required
 
+## API
+For the TLDR, check out [public.go](https://github.com/slobdell/skew-binomial-queues/blob/master/public.go) to understand the access and instantiation patterns of the data structures provided.
+
+## General Time Complexity
 #### Enqueue: O(1)
 #### Peek: O(1)
 #### Dequeue: O(log N)
 #### Length: O(1)
 #### Meld: O(1)
 
-The fundamental advantage over a comparable priority queue datastructure is the ability to meld queues in constant time.
-
-This `BootstrappedSkewBinomialQueue` is also noteworthy in that every operation against the priority queue is copy-on-write. Therefore, any given version of the queue is immutable which can be taken advantage of for particular cases. Operations that imply mutations (Enqueue, Dequeue, and Meld) actually return references to new respective roots in the underlying tree without changing the tree itself.
-
-
 ## Usage:
 ```
 type ArbitraryDataType struct {
     ArbitraryData string
-    Score         int
+    score         int
 }
 
-func (a ArbitraryDataType) LessThan(otherPriority skewBinomialQ.QueuePriority) bool {
-	casted, ok := otherPriority.(ArbitraryDataType)
-	if ok {
-		return a.Score < casted.Score
-	}
-	return false
+func (a ArbitraryDataType) Score() int {
+  return a.score
 }
 
 arbitraryScore := 100
-q1 := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+q1 := priorityQ.NewImmutableSynchronousQ()
 
 /**********  ENQUEUE  **********/
 q1 = q1.Enqueue(
@@ -56,6 +54,17 @@ anotherQ := NewEmptyBootstrappedSkewBinomialQueue()
 melded := q1.Meld(anotherQ)
 ```
 
-The library was also an experiment with lock-free datastructures. You can also initialize a `LazyMergeSkewBinomialQueue` in place of the synchronous `BootstrappedSkewBinomialQueue`. This datastructure will allow for thread-safe operations, but it will NOT guarantee that the highest priority element is popped in the case that the queue is saturated with dequeues from multiple threads.
+### All Cases
+* Constant time enqueue
 
-As the code currently stands, there are some less than optimal uses of goroutines that need to be cleaned up, so it is unlikely that the concurrent implementation offers significant benefit to any consumers.
+### Use Cases for the Mutable Parallel Priority Queue
+* Thread safe priority queue
+* Constant time dequeue on the hot path
+* A relatively high priority element, but not necessarily the highest priority element, is an acceptable value during concurrent dequeue operations
+* Best case constant time meld
+
+### Use Cases for the Immutable Synchronous Priority Queue
+* Not inherently thread safe
+* Constant time meld
+* Complete immutability is desirable (Any reference to a particular version of the data structure can be maintained indefinitely)
+* Logarithmic time dequeues

@@ -85,7 +85,7 @@ func qLessThanOther(q1 unsafe.Pointer, q2 unsafe.Pointer) bool {
 	} else if priorityQ2.IsEmpty() {
 		return true
 	} else {
-		return priorityQ1.Peek().LessThan(priorityQ2.Peek())
+		return priorityQ1.Peek().Score() < priorityQ2.Peek().Score()
 	}
 }
 
