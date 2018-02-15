@@ -1,4 +1,4 @@
-package skewBinomialQ
+package priorityq
 
 import (
 	"sync/atomic"

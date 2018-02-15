@@ -1,39 +1,38 @@
-package skewBinomialQ_test
+package priorityq
 
 import (
 	"fmt"
 	//"math/rand"
-	"skewBinomialQ"
 	"testing"
 	"time"
 	"unsafe"
 )
 
-type IntegerQueuePriority struct {
+type IntegerPriorityScorer struct {
 	value int
 }
 
-func (i IntegerQueuePriority) String() string {
+func (i IntegerPriorityScorer) String() string {
 	return fmt.Sprintf("<Integer value %d>", i.value)
 }
 
 const TEST_TIME = true
 
-func (i IntegerQueuePriority) LessThan(otherPriority skewBinomialQ.QueuePriority) bool {
-	integerQueuePriority, ok := otherPriority.(IntegerQueuePriority)
+func (i IntegerPriorityScorer) LessThan(otherPriority PriorityScorer) bool {
+	integerPriorityScorer, ok := otherPriority.(IntegerPriorityScorer)
 	if ok {
-		return i.value < integerQueuePriority.value
+		return i.value < integerPriorityScorer.value
 	}
 	return false
 }
 
 func TestEnqueueLength(t *testing.T) {
-	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	q := newEmptyBootstrappedSkewBinomial()
 	if q.Length() != 0 {
 		t.Error("Queue length is not 0")
 	}
 	q = q.Enqueue(
-		IntegerQueuePriority{0},
+		IntegerPriorityScorer{0},
 	)
 	if q.Length() != 1 {
 		t.Error("Queue length is not 1")
@@ -46,19 +45,19 @@ func TestEnqueueLength(t *testing.T) {
 
 func TestEnqueueDequeue(t *testing.T) {
 	return
-	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	q := newEmptyBootstrappedSkewBinomial()
 	values := []int{20, 10, 30, 5, 3, 0, 25}
 
 	for _, value := range values {
 		q = q.Enqueue(
-			IntegerQueuePriority{value},
+			IntegerPriorityScorer{value},
 		)
 	}
 	dequeueValues := []int{}
-	var queuePriority skewBinomialQ.QueuePriority
+	var queuePriority PriorityScorer
 	for {
 		queuePriority, q = q.Dequeue()
-		dequeued, ok := queuePriority.(IntegerQueuePriority)
+		dequeued, ok := queuePriority.(IntegerPriorityScorer)
 		if !ok {
 			break
 		}
@@ -75,19 +74,19 @@ func TestEnqueueDequeue(t *testing.T) {
 
 func TestMeld(t *testing.T) {
 	return
-	q1 := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	q1 := newEmptyBootstrappedSkewBinomial()
 	values := []int{1, 2, 3}
 	for _, value := range values {
 		q1 = q1.Enqueue(
-			IntegerQueuePriority{value},
+			IntegerPriorityScorer{value},
 		)
 	}
 
-	q2 := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	q2 := newEmptyBootstrappedSkewBinomial()
 	values = []int{4, 5, 6}
 	for _, value := range values {
 		q2 = q2.Enqueue(
-			IntegerQueuePriority{value},
+			IntegerPriorityScorer{value},
 		)
 	}
 	q3 := q1.Meld(q2)
@@ -96,10 +95,10 @@ func TestMeld(t *testing.T) {
 	if q3.Length() != expectedLength {
 		t.Error("Lengths are not equal")
 	}
-	var queuePriority skewBinomialQ.QueuePriority
+	var queuePriority PriorityScorer
 	for {
 		queuePriority, q3 = q3.Dequeue()
-		dequeued, ok := queuePriority.(IntegerQueuePriority)
+		dequeued, ok := queuePriority.(IntegerPriorityScorer)
 		if !ok {
 			break
 		}
@@ -114,12 +113,12 @@ func TestMeld(t *testing.T) {
 }
 
 func TestIsEmpty(t *testing.T) {
-	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	q := newEmptyBootstrappedSkewBinomial()
 	if !q.IsEmpty() {
 		t.Error("Queue is not empty")
 	}
 	q = q.Enqueue(
-		IntegerQueuePriority{0},
+		IntegerPriorityScorer{0},
 	)
 	if q.IsEmpty() {
 		t.Error("Queue is empty")
@@ -132,7 +131,7 @@ func int64LessThan(i1, i2 unsafe.Pointer) bool {
 
 func TestThreadSafetyListInsert(t *testing.T) {
 	return
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 	var randomNumbers []int64
 	sampleSize := 1000
 	// var seed int64 = 10
@@ -166,7 +165,7 @@ func TestThreadSafetyListInsert(t *testing.T) {
 }
 
 func TestListInsertObject(t *testing.T) {
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
 	expectedItems := []int64{2, 4, 5, 10, 17, 20, 30}
 
@@ -187,7 +186,7 @@ func TestListInsertObject(t *testing.T) {
 
 func TestPopFirst(t *testing.T) {
 
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 
 	// test empty
 	failAddress := unsafe.Pointer(new(int))
@@ -213,7 +212,7 @@ func TestPopFirst(t *testing.T) {
 }
 
 func TestPopNth(t *testing.T) {
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 
 	items := []int64{30, 10, 2, 4, 17, 20}
 
@@ -243,7 +242,7 @@ func TestPopNth(t *testing.T) {
 
 }
 func TestListPopHead(t *testing.T) {
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
 
 	for _, item := range items {
@@ -264,7 +263,7 @@ func TestListPopHead(t *testing.T) {
 
 func TestListDeleteObject(t *testing.T) {
 	return
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
 
 	var addrToDelete *int64
@@ -284,7 +283,7 @@ func TestListDeleteObject(t *testing.T) {
 }
 
 func TestListCounter(t *testing.T) {
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
 	for _, item := range items {
 		newlyAllocatedItem := item
@@ -295,7 +294,7 @@ func TestListCounter(t *testing.T) {
 	}
 }
 func TestListIter(t *testing.T) {
-	list := skewBinomialQ.ThreadSafeList{}
+	list := ThreadSafeList{}
 	items := []int64{30, 10, 2, 4, 17, 5, 20}
 	expectedItems := []int64{2, 4, 5, 10, 17, 20, 30}
 
@@ -320,19 +319,19 @@ func TestEffectiveDequeue(t *testing.T) {
 	for i := 0; i < sampleSize; i++ {
 		randomNumbers = append(randomNumbers, i)
 	}
-	q := skewBinomialQ.NewEmptySkewBinomialQueue()
+	q := newEmptySkewBinomial()
 	for _, number := range randomNumbers {
 		q = q.Enqueue(
-			IntegerQueuePriority{number},
-		).(skewBinomialQ.SkewBinomialQueue)
+			IntegerPriorityScorer{number},
+		).(skewBinomial)
 	}
 	shouldBeSorted := []int{}
-	var priority skewBinomialQ.QueuePriority
-	var qP skewBinomialQ.PriorityQueue
+	var priority PriorityScorer
+	var qP PriorityQ
 	for {
 		priority, qP = q.Dequeue()
-		q = qP.(skewBinomialQ.SkewBinomialQueue)
-		intPriority, ok := priority.(IntegerQueuePriority)
+		q = qP.(skewBinomial)
+		intPriority, ok := priority.(IntegerPriorityScorer)
 		if ok {
 			shouldBeSorted = append(shouldBeSorted, intPriority.value)
 			validateSortedList(shouldBeSorted, t)
@@ -358,18 +357,18 @@ func TestSpeed(t *testing.T) {
 		randomNumbers = append(randomNumbers, i)
 	}
 
-	q := skewBinomialQ.NewEmptyBootstrappedSkewBinomialQueue()
+	q := newEmptyBootstrappedSkewBinomial()
 	for _, number := range randomNumbers {
 		q = q.Enqueue(
-			IntegerQueuePriority{number},
+			IntegerPriorityScorer{number},
 		)
 	}
 
 	//shouldBeSorted := []int{}
-	var priority skewBinomialQ.QueuePriority
+	var priority PriorityScorer
 	for {
 		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerQueuePriority)
+		_, ok := priority.(IntegerPriorityScorer)
 		if ok {
 			//shouldBeSorted = append(shouldBeSorted, intPriority.value)
 			//validateSortedList(shouldBeSorted, t)
@@ -417,7 +416,6 @@ func TestSpeedFreeList(t *testing.T) {
 	if !TEST_TIME {
 		return
 	}
-
 	var randomNumbers []int
 	sampleSize := 1000000
 	//var seed int64 = 10
@@ -427,28 +425,32 @@ func TestSpeedFreeList(t *testing.T) {
 		randomNumbers = append(randomNumbers, i)
 	}
 
-	q := skewBinomialQ.NewEmptyLazyMergeSkewBinomialQueue()
+	start := time.Now()
+	q := NewMutableParallelQ()
 	for index, number := range randomNumbers {
 		if index%10000 == 0 {
 			percentDone := 100.0 * (float64(index) / float64(sampleSize))
-			fmt.Printf("added %f items\n", percentDone)
+			fmt.Printf("%f complete, added %d items\n", percentDone, index)
 		}
 		q = q.Enqueue(
-			IntegerQueuePriority{number},
+			IntegerPriorityScorer{number},
 		)
 	}
 	fmt.Printf("Enqueued %d total items\n", len(randomNumbers))
 	fmt.Printf("ALL DONE HERE\n")
+	end := time.Now()
+	fmt.Printf("Enqueue delta time: %s\n", end.Sub(start))
 
 	// SBL for some reason if there are no pending operations that's when
 	// things seem to be in a bad state
-	//(q.(skewBinomialQ.LazyMergeSkewBinomialQueue)).BlockUntilNoPending()
+	//(q.(ParallelQ)).BlockUntilNoPending()
 
+	start = time.Now()
 	dequeueCount := 0
-	var priority skewBinomialQ.QueuePriority
+	var priority PriorityScorer
 	for {
 		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerQueuePriority)
+		_, ok := priority.(IntegerPriorityScorer)
 		if ok {
 			dequeueCount++
 			//fmt.Printf("Value of int is %s\n", intPriority)
@@ -456,15 +458,16 @@ func TestSpeedFreeList(t *testing.T) {
 			break
 		}
 	}
-	fmt.Printf("Dequeued %d total items\n", dequeueCount)
+	end = time.Now()
+	fmt.Printf("Dequeued %d total items in time: %s\n", dequeueCount, end.Sub(start))
 	/*
-		var priority skewBinomialQ.QueuePriority
+		var priority PriorityScorer
 		for {
 			priority, q = q.Dequeue()
 			//fmt.Printf("Dequeued object: %s\n", priority)
-			something, ok := priority.(IntegerQueuePriority)
+			something, ok := priority.(IntegerPriorityScorer)
 
-			_, ahfuck := priority.(skewBinomialQ.BootstrappedSkewBinomialQueue)
+			_, ahfuck := priority.(bootstrappedSkewBinomial)
 			if ahfuck {
 				panic("DAMMIT, BOOTSTRAPPED SKEWS ARE BEING INSERTED INTO OTHER BOOTSTRAPPED SKEWS")
 			}
@@ -481,7 +484,7 @@ func TestSpeedFreeList(t *testing.T) {
 		time.Sleep(1 * time.Second)
 		fmt.Printf("TRYING TO DEQ again\n")
 		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerQueuePriority)
+		_, ok := priority.(IntegerPriorityScorer)
 		if ok {
 			fmt.Printf("YOU SUCK AT PROGRAMMING\n")
 		}

@@ -1,8 +1,7 @@
-package skewBinomialQ
+package priorityq
 
 import (
 	"bytes"
-	//"fmt"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -10,10 +9,27 @@ import (
 	"unsafe"
 )
 
+// this number is based off of simple tuning experimentation
+const PARALLELISM_COEFF = 2
+
 // TODO I'm a golang newb, make more elegant decorators
 var cachedMaxParallelism *int
 
 var FAIL_ADDRESS unsafe.Pointer = unsafe.Pointer(new(int8))
+var meldSignaler = make(chan ParallelQ)
+
+type insertBootstrappedParams struct {
+	q            ParallelQ
+	bootstrapped bootstrappedSkewBinomial
+}
+
+type insertSkewParams struct {
+	q     ParallelQ
+	skewQ skewBinomial
+}
+
+var insertSignaler = make(chan insertBootstrappedParams)
+var insertSkewSignaler = make(chan insertSkewParams)
 
 const MELD_PERIOD = 2
 
@@ -36,9 +52,30 @@ func MaxParallelism() int {
 	return returnValue
 }
 
+func meldWorker() {
+	for {
+		q := <-meldSignaler
+		q.meldFreeQueues()
+	}
+}
+
+func asyncInsertWorker() {
+	for {
+		params := <-insertSignaler
+		params.q.asyncInsert(params.bootstrapped)
+	}
+}
+
+func asyncInsertSkewWorker() {
+	for {
+		params := <-insertSkewSignaler
+		params.q.asyncInsertSkew(params.skewQ)
+	}
+}
+
 func qLessThanOther(q1 unsafe.Pointer, q2 unsafe.Pointer) bool {
-	priorityQ1 := (*BootstrappedSkewBinomialQueue)(q1)
-	priorityQ2 := (*BootstrappedSkewBinomialQueue)(q2)
+	priorityQ1 := (*bootstrappedSkewBinomial)(q1)
+	priorityQ2 := (*bootstrappedSkewBinomial)(q2)
 	if priorityQ2.IsEmpty() {
 		return false
 	}
@@ -52,47 +89,30 @@ func qLessThanOther(q1 unsafe.Pointer, q2 unsafe.Pointer) bool {
 	}
 }
 
-type LazyMergeSkewBinomialQueue struct {
+type ParallelQ struct {
 	freeQueueList   *ThreadSafeList
 	pendingOpsCount *int32
 	length          *int64
 	meldCounter     *int32
 }
 
-func NewEmptyLazyMergeSkewBinomialQueue() PriorityQueue {
-	primitiveQ := NewEmptyBootstrappedSkewBinomialQueue()
-	threadSafeList := ThreadSafeList{}
-	threadSafeList.InsertObject(
-		unsafe.Pointer(&primitiveQ),
-		qLessThanOther,
-	)
-
-	lazyQ := LazyMergeSkewBinomialQueue{
-		freeQueueList:   &threadSafeList,
-		pendingOpsCount: new(int32),
-		length:          new(int64),
-		meldCounter:     new(int32),
-	}
-	return lazyQ
-}
-
-func (q LazyMergeSkewBinomialQueue) incrOpsCount() {
+func (q ParallelQ) incrOpsCount() {
 	atomic.AddInt32(q.pendingOpsCount, 1)
 }
 
-func (q LazyMergeSkewBinomialQueue) decrOpsCount() {
+func (q ParallelQ) decrOpsCount() {
 	atomic.AddInt32(q.pendingOpsCount, -1)
 }
 
-func (q LazyMergeSkewBinomialQueue) incrLength() {
+func (q ParallelQ) incrLength() {
 	atomic.AddInt64(q.length, 1)
 }
 
-func (q LazyMergeSkewBinomialQueue) decrLength() {
+func (q ParallelQ) decrLength() {
 	atomic.AddInt64(q.length, -1)
 }
 
-func (q LazyMergeSkewBinomialQueue) BlockUntilNoPending() {
+func (q ParallelQ) BlockUntilNoPending() {
 	for {
 		currentValue := *(q.pendingOpsCount)
 		if currentValue == 0 {
@@ -102,8 +122,8 @@ func (q LazyMergeSkewBinomialQueue) BlockUntilNoPending() {
 	}
 }
 
-func (q LazyMergeSkewBinomialQueue) Enqueue(priority QueuePriority) PriorityQueue {
-	sizeOneQ := NewEmptyBootstrappedSkewBinomialQueue().Enqueue(priority)
+func (q ParallelQ) Enqueue(priority PriorityScorer) PriorityQ {
+	sizeOneQ := newEmptyBootstrappedSkewBinomial().Enqueue(priority)
 	q.freeQueueList.InsertObject(
 		unsafe.Pointer(&sizeOneQ),
 		qLessThanOther,
@@ -113,15 +133,15 @@ func (q LazyMergeSkewBinomialQueue) Enqueue(priority QueuePriority) PriorityQueu
 	return q
 }
 
-func (q LazyMergeSkewBinomialQueue) startMeldFreeQueues() {
+func (q ParallelQ) startMeldFreeQueues() {
 	if atomic.AddInt32(q.meldCounter, 1)%MELD_PERIOD != 0 {
 		return
 	}
 	q.incrOpsCount()
-	go q.meldFreeQueues()
+	meldSignaler <- q
 }
 
-func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
+func (q ParallelQ) meldFreeQueues() {
 	defer q.decrOpsCount()
 	queuesToFetch := 2
 	if !q.freeQueueList.LengthGreaterThan(MaxParallelism() + (queuesToFetch - 1)) {
@@ -143,8 +163,8 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 		queues = append(queues, poppedQ)
 		time.Sleep(0)
 	}
-	q1 := *((*BootstrappedSkewBinomialQueue)(queues[0]))
-	q2 := *((*BootstrappedSkewBinomialQueue)(queues[1]))
+	q1 := *((*bootstrappedSkewBinomial)(queues[0]))
+	q2 := *((*bootstrappedSkewBinomial)(queues[1]))
 	finalQ := (q1.Meld(q2))
 	q.freeQueueList.InsertObject(
 		unsafe.Pointer(&finalQ),
@@ -155,7 +175,7 @@ func (q LazyMergeSkewBinomialQueue) meldFreeQueues() {
 	}
 }
 
-func (q LazyMergeSkewBinomialQueue) Peek() QueuePriority {
+func (q ParallelQ) Peek() PriorityScorer {
 	// TODO unsure if this piece is valid...
 	// TODO not actually valid..
 	var qPtr unsafe.Pointer
@@ -167,13 +187,13 @@ func (q LazyMergeSkewBinomialQueue) Peek() QueuePriority {
 		}
 		break
 	}
-	firstQ := (*BootstrappedSkewBinomialQueue)(qPtr)
+	firstQ := (*bootstrappedSkewBinomial)(qPtr)
 	return firstQ.Peek()
 }
 
-func (q LazyMergeSkewBinomialQueue) Meld(otherQ PriorityQueue) PriorityQueue {
+func (q ParallelQ) Meld(otherQ PriorityQ) PriorityQ {
 	panic("do not use until we have test coverage")
-	otherLazyQ := otherQ.(LazyMergeSkewBinomialQueue)
+	otherLazyQ := otherQ.(ParallelQ)
 	otherList := otherLazyQ.freeQueueList
 	for {
 		qPtr := otherList.PopFirst(FAIL_ADDRESS)
@@ -185,20 +205,20 @@ func (q LazyMergeSkewBinomialQueue) Meld(otherQ PriorityQueue) PriorityQueue {
 			qLessThanOther,
 		)
 	}
-	go q.meldFreeQueues()
+	meldSignaler <- q
 	return q
 }
 
-func (q LazyMergeSkewBinomialQueue) Length() int {
+func (q ParallelQ) Length() int {
 	return int(*(q.length))
 }
 
-func (q LazyMergeSkewBinomialQueue) IsEmpty() bool {
+func (q ParallelQ) IsEmpty() bool {
 	firstQPtr := q.freeQueueList.Peek()
 	if firstQPtr == nil {
 		return true
 	}
-	return (*SkewBinomialQueue)(firstQPtr).IsEmpty()
+	return (*skewBinomial)(firstQPtr).IsEmpty()
 }
 
 func getGID() uint64 {
@@ -213,7 +233,7 @@ func getGID() uint64 {
 	return n
 }
 
-func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
+func (q ParallelQ) Dequeue() (PriorityScorer, PriorityQ) {
 	// fmt.Printf("current count of list: %d\n", q.freeQueueList.Count())
 	var qPtr unsafe.Pointer = FAIL_ADDRESS
 
@@ -230,7 +250,7 @@ func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
 		}
 	}
 
-	bootstrappedQ := (*BootstrappedSkewBinomialQueue)(qPtr)
+	bootstrappedQ := (*bootstrappedSkewBinomial)(qPtr)
 
 	if bootstrappedQ.IsEmpty() {
 		if q.Length() > 0 {
@@ -241,26 +261,25 @@ func (q LazyMergeSkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
 	queuePriority, remainingBootstrappedQ := bootstrappedQ.DequeueWithMergeCallback(
 		q.lazyMergeCallback,
 	)
-	// queuePriority, remainingBootstrappedQ := bootstrappedQ.Dequeue()
 
 	q.startInsert(remainingBootstrappedQ)
 	defer q.decrLength()
 	return queuePriority, q
 }
 
-func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
+func (q ParallelQ) lazyMergeCallback(childNodes []node, remainingQueues ...*skewBinomial) skewBinomial {
 	passThruQueuePtr := remainingQueues[0]
 	passThruQ := *passThruQueuePtr
-	var validSkewQs []SkewBinomialQueue
+	var validSkewQs []skewBinomial = make([]skewBinomial, 0, len(remainingQueues)-1+len(childNodes))
 
 	for _, skewQ := range remainingQueues[1:] {
 		newlyAllocatedItem := skewQ
 		validSkewQs = append(validSkewQs, *newlyAllocatedItem)
 	}
-	var prioritiesRankZero []QueuePriority
+	var prioritiesRankZero []PriorityScorer
 	for _, child := range childNodes {
 		if child.Rank() > 0 {
-			validQ := newSkewBinomialQueue(
+			validQ := newSkewBinomial(
 				child,
 				nil,
 			)
@@ -272,7 +291,7 @@ func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remaini
 			)
 		}
 	}
-	freshQ := NewEmptySkewBinomialQueue().bulkInsert(prioritiesRankZero...)
+	freshQ := newEmptySkewBinomial().bulkInsert(prioritiesRankZero...)
 	q.startInsertSkew(freshQ)
 	for _, skewQ := range validSkewQs {
 		q.startInsertSkew(skewQ)
@@ -281,23 +300,29 @@ func (q LazyMergeSkewBinomialQueue) lazyMergeCallback(childNodes []Node, remaini
 	return passThruQ
 }
 
-func (q LazyMergeSkewBinomialQueue) startInsert(bootstrappedQ BootstrappedSkewBinomialQueue) {
+func (q ParallelQ) startInsert(bootstrappedQ bootstrappedSkewBinomial) {
 	q.incrOpsCount()
-	go q.asyncInsert(bootstrappedQ)
+	insertSignaler <- insertBootstrappedParams{
+		q,
+		bootstrappedQ,
+	}
 }
 
-func (q LazyMergeSkewBinomialQueue) startInsertSkew(skewQ SkewBinomialQueue) {
+func (q ParallelQ) startInsertSkew(skewQ skewBinomial) {
 	q.incrOpsCount()
-	go q.asyncInsertSkew(skewQ)
+	insertSkewSignaler <- insertSkewParams{
+		q,
+		skewQ,
+	}
 }
 
-func (q LazyMergeSkewBinomialQueue) asyncInsertSkew(skewQ SkewBinomialQueue) {
+func (q ParallelQ) asyncInsertSkew(skewQ skewBinomial) {
 	q.asyncInsert(
 		skewQToBootstrappedQ(skewQ),
 	)
 }
 
-func (q LazyMergeSkewBinomialQueue) asyncInsert(bootstrappedQ BootstrappedSkewBinomialQueue) {
+func (q ParallelQ) asyncInsert(bootstrappedQ bootstrappedSkewBinomial) {
 	defer q.decrOpsCount()
 	q.freeQueueList.InsertObject(
 		unsafe.Pointer(&bootstrappedQ),
@@ -305,11 +330,36 @@ func (q LazyMergeSkewBinomialQueue) asyncInsert(bootstrappedQ BootstrappedSkewBi
 	)
 }
 
-func (q LazyMergeSkewBinomialQueue) transformAndInsert(skewQ SkewBinomialQueue) {
+func (q ParallelQ) transformAndInsert(skewQ skewBinomial) {
 	defer q.decrOpsCount()
 	bootstrappedQ := skewQToBootstrappedQ(skewQ)
 	q.freeQueueList.InsertObject(
 		unsafe.Pointer(&bootstrappedQ),
 		qLessThanOther,
 	)
+}
+
+func newParallelQ() PriorityQ {
+	primitiveQ := newEmptyBootstrappedSkewBinomial()
+	threadSafeList := ThreadSafeList{}
+	threadSafeList.InsertObject(
+		unsafe.Pointer(&primitiveQ),
+		qLessThanOther,
+	)
+
+	lazyQ := ParallelQ{
+		freeQueueList:   &threadSafeList,
+		pendingOpsCount: new(int32),
+		length:          new(int64),
+		meldCounter:     new(int32),
+	}
+	return lazyQ
+}
+
+func init() {
+	for i := 0; i < int(PARALLELISM_COEFF*float32(MaxParallelism())); i++ {
+		go meldWorker()
+		go asyncInsertWorker()
+		go asyncInsertSkewWorker()
+	}
 }

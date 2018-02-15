@@ -1,4 +1,4 @@
-package skewBinomialQ
+package priorityq
 
 import (
 	"fmt"
@@ -14,99 +14,86 @@ var skewQueueCount *int32 = new(int32)
 // 6,526,797
 var bootstrappedQueueCount *int32 = new(int32)
 
-type QueuePriority interface {
-	LessThan(otherPriority QueuePriority) bool
-}
-
-func min(x, y QueuePriority) QueuePriority {
+func min(x, y PriorityScorer) PriorityScorer {
 	if x.LessThan(y) {
 		return x
 	}
 	return y
 }
 
-type Node interface {
+type node interface {
 	Rank() int
 	Length() int
-	Children() []Node
-	Peek() QueuePriority
-	Link(heaps ...Node) Node
+	Children() []node
+	Peek() PriorityScorer
+	Link(heaps ...node) node
 	IsEmpty() bool
 }
 
-type PriorityQueue interface {
-	Enqueue(priority QueuePriority) PriorityQueue
-	Peek() QueuePriority
-	Meld(otherQ PriorityQueue) PriorityQueue
-	Dequeue() (QueuePriority, PriorityQueue)
-	Length() int
-	IsEmpty() bool
+var NULL_OBJECT = nullObject{}
+
+type nullObject struct {
+	head     *nullObject
+	children []node
 }
 
-var NULL_OBJECT = NullObject{}
-
-type NullObject struct {
-	head     *NullObject
-	children []Node
-}
-
-func (n NullObject) Link(heaps ...Node) Node {
+func (n nullObject) Link(heaps ...node) node {
 	return n
 }
 
-func (n NullObject) Peek() QueuePriority {
+func (n nullObject) Peek() PriorityScorer {
 	return nil
 }
 
-func (n NullObject) Children() []Node {
+func (n nullObject) Children() []node {
 	return n.children
 }
 
-func (n NullObject) Rank() int {
+func (n nullObject) Rank() int {
 	return -1
 }
 
-func (n NullObject) IsEmpty() bool {
+func (n nullObject) IsEmpty() bool {
 	return true
 }
 
-func (n NullObject) Length() int {
+func (n nullObject) Length() int {
 	return 0
 }
 
-type SkewBinomialHeap struct {
+type skewBinomialHeap struct {
 	rank     int
-	priority QueuePriority
-	children []Node // this is possibly problematic but I'm not sure..pointer vs non pointer
+	priority PriorityScorer
+	children []node // this is possibly problematic but I'm not sure..pointer vs non pointer
 	length   int
 }
 
-type skewByRank []SkewBinomialQueue
+type skewByRank []skewBinomial
 
 func (a skewByRank) Len() int           { return len(a) }
 func (a skewByRank) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a skewByRank) Less(i, j int) bool { return a[i].rank() > a[j].rank() }
 
-type byRank []Node
+type byRank []node
 
 func (a byRank) Len() int           { return len(a) }
 func (a byRank) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byRank) Less(i, j int) bool { return a[i].Rank() < a[j].Rank() }
 
-type byPriority []Node
+type byPriority []node
 
 func (a byPriority) Len() int           { return len(a) }
 func (a byPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byPriority) Less(i, j int) bool { return a[i].Peek().LessThan(a[j].Peek()) }
 
-func NewSkewBinomialHeap(priority QueuePriority) Node {
-	return SkewBinomialHeap{
+func newSkewBinomialHeap(priority PriorityScorer) node {
+	return skewBinomialHeap{
 		priority: priority,
 		length:   1,
 	}
 }
 
-func highestPriorityHeap(heaps ...Node) Node {
+func highestPriorityHeap(heaps ...node) node {
 	sort.Sort(
 		byPriority(
 			heaps,
@@ -115,7 +102,7 @@ func highestPriorityHeap(heaps ...Node) Node {
 	return heaps[0]
 }
 
-func lowerRankHeaps(heaps ...Node) []Node {
+func lowerRankHeaps(heaps ...node) []node {
 	sort.Sort(
 		byPriority(
 			heaps,
@@ -130,13 +117,13 @@ func lowerRankHeaps(heaps ...Node) []Node {
 	return heaps
 }
 
-func newNode(priority QueuePriority, rank int, children []Node) Node {
+func newNode(priority PriorityScorer, rank int, children []node) node {
 	var existingLength int
 	for _, node := range children {
 		// TODO see if I can do this more elegantly?
 		existingLength += node.Length()
 	}
-	return SkewBinomialHeap{
+	return skewBinomialHeap{
 		rank:     rank,
 		priority: priority,
 		children: children,
@@ -144,15 +131,15 @@ func newNode(priority QueuePriority, rank int, children []Node) Node {
 	}
 }
 
-func (s SkewBinomialHeap) IsEmpty() bool {
+func (s skewBinomialHeap) IsEmpty() bool {
 	return false
 }
 
-func (s SkewBinomialHeap) Children() []Node {
+func (s skewBinomialHeap) Children() []node {
 	return s.children
 }
 
-func (s SkewBinomialHeap) Link(heaps ...Node) Node {
+func (s skewBinomialHeap) Link(heaps ...node) node {
 	heaps = append(heaps, s)
 	sort.Sort(
 		byRank(
@@ -171,42 +158,42 @@ func (s SkewBinomialHeap) Link(heaps ...Node) Node {
 	)
 }
 
-func (s SkewBinomialHeap) Length() int {
+func (s skewBinomialHeap) Length() int {
 	return s.length
 }
 
-func (s SkewBinomialHeap) Rank() int {
+func (s skewBinomialHeap) Rank() int {
 	return s.rank
 }
 
-func (s SkewBinomialHeap) Peek() QueuePriority {
+func (s skewBinomialHeap) Peek() PriorityScorer {
 	return s.priority
 }
 
-type SkewBinomialQueue struct {
-	heapHead     Node
-	rightSibling *SkewBinomialQueue
+type skewBinomial struct {
+	heapHead     node
+	rightSibling *skewBinomial
 }
 
-func NewEmptySkewBinomialQueue() SkewBinomialQueue {
-	return SkewBinomialQueue{
+func newEmptySkewBinomial() skewBinomial {
+	return skewBinomial{
 		heapHead:     NULL_OBJECT,
 		rightSibling: nil,
 	}
 }
 
-func newSkewBinomialQueue(heapHead Node, rightSibling *SkewBinomialQueue) SkewBinomialQueue {
-	return SkewBinomialQueue{
+func newSkewBinomial(heapHead node, rightSibling *skewBinomial) skewBinomial {
+	return skewBinomial{
 		heapHead:     heapHead,
 		rightSibling: rightSibling,
 	}
 }
 
-func (q SkewBinomialQueue) String() string {
+func (q skewBinomial) String() string {
 	return fmt.Sprintf("<Skew Binomial Queue, peek value: %s, Length: %d>", q.Peek(), q.Length())
 }
 
-func (q SkewBinomialQueue) firstTwoTreesEqualRank() bool {
+func (q skewBinomial) firstTwoTreesEqualRank() bool {
 	if q.heapHead.IsEmpty() {
 		return false
 	}
@@ -216,25 +203,25 @@ func (q SkewBinomialQueue) firstTwoTreesEqualRank() bool {
 	return q.rank() == q.rightSibling.rank()
 }
 
-func (q SkewBinomialQueue) Enqueue(priority QueuePriority) PriorityQueue {
+func (q skewBinomial) Enqueue(priority PriorityScorer) PriorityQ {
 	// SBL ADD A FUNCTION TO WALK WHAT THE PRIORITIES ARE...
 	if q.firstTwoTreesEqualRank() {
 		// null checks should not be necessary here since first two trees are equal
-		return newSkewBinomialQueue(
-			NewSkewBinomialHeap(priority).Link(
+		return newSkewBinomial(
+			newSkewBinomialHeap(priority).Link(
 				q.heapHead,
 				q.rightSibling.heapHead,
 			),
 			q.rightSibling.rightSibling,
 		)
 	}
-	return newSkewBinomialQueue(
-		NewSkewBinomialHeap(priority),
+	return newSkewBinomial(
+		newSkewBinomialHeap(priority),
 		&q,
 	)
 }
 
-func (q SkewBinomialQueue) Peek() QueuePriority {
+func (q skewBinomial) Peek() PriorityScorer {
 	if q.heapHead.IsEmpty() {
 		return nil
 	}
@@ -250,14 +237,14 @@ func (q SkewBinomialQueue) Peek() QueuePriority {
 	)
 }
 
-func (q SkewBinomialQueue) Meld(otherQ PriorityQueue) PriorityQueue {
+func (q skewBinomial) Meld(otherQ PriorityQ) PriorityQ {
 	if q.IsEmpty() {
 		return otherQ
 	} else if otherQ.IsEmpty() {
 		return q
 	}
 
-	otherSkewQ, ok := otherQ.(SkewBinomialQueue)
+	otherSkewQ, ok := otherQ.(skewBinomial)
 	if !ok {
 		panic("Meld unequal priority queue types")
 	}
@@ -268,41 +255,41 @@ func (q SkewBinomialQueue) Meld(otherQ PriorityQueue) PriorityQueue {
 			allForests,
 		),
 	)
-	finalQ := new(SkewBinomialQueue)
+	finalQ := new(skewBinomial)
 
-	*finalQ = NewEmptySkewBinomialQueue()
+	*finalQ = newEmptySkewBinomial()
 
 	for _, qOneTree := range allForests {
 		if finalQ.heapHead.IsEmpty() {
 			// TODO avoid special casing this if I can
-			*finalQ = newSkewBinomialQueue(
+			*finalQ = newSkewBinomial(
 				qOneTree.heapHead,
 				nil,
 			)
 		} else if finalQ.rank() == qOneTree.rank() {
 			if finalQ.rightSibling == nil {
-				*finalQ = newSkewBinomialQueue(
+				*finalQ = newSkewBinomial(
 					finalQ.heapHead.Link(qOneTree.heapHead),
 					nil,
 				)
 			} else {
 				priorityQ := finalQ.rightSibling.Meld(
-					newSkewBinomialQueue(
+					newSkewBinomial(
 						finalQ.heapHead.Link(qOneTree.heapHead),
 						nil,
 					),
 				)
-				*finalQ, ok = priorityQ.(SkewBinomialQueue)
+				*finalQ, ok = priorityQ.(skewBinomial)
 			}
 		} else if qOneTree.rank() < finalQ.rank() {
-			newQ := newSkewBinomialQueue(
+			newQ := newSkewBinomial(
 				qOneTree.heapHead,
 				finalQ,
 			)
-			finalQ = new(SkewBinomialQueue)
+			finalQ = new(skewBinomial)
 			*finalQ = newQ
 		} else {
-			*finalQ = newSkewBinomialQueue(
+			*finalQ = newSkewBinomial(
 				finalQ.heapHead,
 				&qOneTree,
 			)
@@ -311,52 +298,52 @@ func (q SkewBinomialQueue) Meld(otherQ PriorityQueue) PriorityQueue {
 	return *finalQ
 }
 
-func (q SkewBinomialQueue) rank() int {
+func (q skewBinomial) rank() int {
 	// TODO unsure if this method makes this unclear, but most use cases for checking
 	// rank involve cheaking the heap head
 	return q.heapHead.Rank()
 }
 
-func (q SkewBinomialQueue) asIndividualForests() []SkewBinomialQueue {
+func (q skewBinomial) asIndividualForests() []skewBinomial {
 	if q.IsEmpty() {
 		return nil
 	} else if q.rightSibling == nil {
-		return []SkewBinomialQueue{q}
+		return []skewBinomial{q}
 	}
 	return append(
-		[]SkewBinomialQueue{newSkewBinomialQueue(q.heapHead, nil)},
+		[]skewBinomial{newSkewBinomial(q.heapHead, nil)},
 		q.rightSibling.asIndividualForests()...,
 	)
 }
 
-func (q SkewBinomialQueue) Dequeue() (QueuePriority, PriorityQueue) {
+func (q skewBinomial) Dequeue() (PriorityScorer, PriorityQ) {
 	return q.DequeueWithMergeCallback(
 		q.dequeueMergeCallback,
 	)
 }
 
-func (q SkewBinomialQueue) DequeueWithMergeCallback(callback func([]Node, ...*SkewBinomialQueue) SkewBinomialQueue) (QueuePriority, PriorityQueue) {
+func (q skewBinomial) DequeueWithMergeCallback(callback func([]node, ...*skewBinomial) skewBinomial) (PriorityScorer, PriorityQ) {
 	if q.IsEmpty() {
 		return nil, q
 	}
-	poppedQueue, remainingQueue := q.popHighestPriorityQueue()
+	poppedQueue, remainingQueue := q.popHighestPriorityQ()
 	return poppedQueue.Peek(), callback(poppedQueue.heapHead.Children(), &remainingQueue)
 }
 
-func (q SkewBinomialQueue) dequeueMergeCallback(childNodes []Node, remainingQueues ...*SkewBinomialQueue) SkewBinomialQueue {
-	var childrenRankGreaterThanZero []SkewBinomialQueue
-	var prioritiesRankZero []QueuePriority
+func (q skewBinomial) dequeueMergeCallback(childNodes []node, remainingQueues ...*skewBinomial) skewBinomial {
+	var childrenRankGreaterThanZero []skewBinomial
+	var prioritiesRankZero []PriorityScorer
 	remainingQPtr := remainingQueues[0]
 	remainingQueue := *remainingQPtr
 	for _, skewQ := range remainingQueues[1:] {
 		newlyAllocatedItem := skewQ
-		remainingQueue = remainingQueue.Meld(*newlyAllocatedItem).(SkewBinomialQueue)
+		remainingQueue = remainingQueue.Meld(*newlyAllocatedItem).(skewBinomial)
 	}
 	for _, child := range childNodes {
 		if child.Rank() > 0 {
 			childrenRankGreaterThanZero = append(
 				childrenRankGreaterThanZero,
-				newSkewBinomialQueue(
+				newSkewBinomial(
 					child,
 					nil,
 				),
@@ -371,158 +358,148 @@ func (q SkewBinomialQueue) dequeueMergeCallback(childNodes []Node, remainingQueu
 
 	finalQueue := remainingQueue
 	for _, queue := range childrenRankGreaterThanZero {
-		finalQueue, _ = finalQueue.Meld(queue).(SkewBinomialQueue)
+		finalQueue, _ = finalQueue.Meld(queue).(skewBinomial)
 	}
 	return finalQueue.bulkInsert(prioritiesRankZero...)
 }
 
-func (q SkewBinomialQueue) Length() int {
+func (q skewBinomial) Length() int {
 	if q.rightSibling == nil || q.rightSibling.heapHead.IsEmpty() {
 		return q.heapHead.Length()
 	}
 	return q.heapHead.Length() + q.rightSibling.Length()
 }
 
-func (q SkewBinomialQueue) bulkInsert(priorities ...QueuePriority) SkewBinomialQueue {
+func (q skewBinomial) bulkInsert(priorities ...PriorityScorer) skewBinomial {
 	if len(priorities) == 0 {
 		return q
 	}
 	return q.Enqueue(
 		priorities[0],
-	).(SkewBinomialQueue).bulkInsert(priorities[1:]...)
+	).(skewBinomial).bulkInsert(priorities[1:]...)
 }
 
-func (q SkewBinomialQueue) IsEmpty() bool {
+func (q skewBinomial) IsEmpty() bool {
 	return q.heapHead.IsEmpty()
 }
 
-func (q SkewBinomialQueue) popHighestPriorityQueue() (SkewBinomialQueue, SkewBinomialQueue) {
+func (q skewBinomial) popHighestPriorityQ() (skewBinomial, skewBinomial) {
 	if q.rightSibling == nil {
-		return q, NewEmptySkewBinomialQueue()
+		return q, newEmptySkewBinomial()
 	}
 	if q.rightSibling.heapHead.IsEmpty() {
-		return newSkewBinomialQueue(
+		return newSkewBinomial(
 				q.heapHead,
 				nil,
 			),
 			*q.rightSibling
 	}
 	if q.heapHead.Peek().LessThan(q.rightSibling.Peek()) {
-		return newSkewBinomialQueue(
+		return newSkewBinomial(
 				q.heapHead,
 				nil,
 			),
 			*q.rightSibling
 	}
-	poppedQueue, remainingQueue := q.rightSibling.popHighestPriorityQueue()
-	return poppedQueue, newSkewBinomialQueue(q.heapHead, &remainingQueue)
+	poppedQueue, remainingQueue := q.rightSibling.popHighestPriorityQ()
+	return poppedQueue, newSkewBinomial(q.heapHead, &remainingQueue)
 }
 
-type RootedSkewBinomialQueue struct {
-	highestPriorityObject QueuePriority
-	priorityQueue         SkewBinomialQueue
+type rootedSkewBinomial struct {
+	highestPriorityObject PriorityScorer
+	priorityQueue         skewBinomial
 }
 
-func NewEmptyRootedSkewBinomialQueue() RootedSkewBinomialQueue {
-	return RootedSkewBinomialQueue{
+func newRootedSkewBinomial() rootedSkewBinomial {
+	return rootedSkewBinomial{
 		highestPriorityObject: nil,
-		priorityQueue:         NewEmptySkewBinomialQueue(),
+		priorityQueue:         newEmptySkewBinomial(),
 	}
 }
 
-func (r RootedSkewBinomialQueue) IsEmpty() bool {
+func (r rootedSkewBinomial) IsEmpty() bool {
 	return r.highestPriorityObject == nil
 }
 
-func (r RootedSkewBinomialQueue) Enqueue(priority QueuePriority) RootedSkewBinomialQueue {
+func (r rootedSkewBinomial) Enqueue(priority PriorityScorer) rootedSkewBinomial {
 	if r.IsEmpty() {
-		return RootedSkewBinomialQueue{
+		return rootedSkewBinomial{
 			highestPriorityObject: priority,
-			priorityQueue:         NewEmptySkewBinomialQueue(),
+			priorityQueue:         newEmptySkewBinomial(),
 		}
 	}
 	if r.highestPriorityObject.LessThan(priority) {
-		return RootedSkewBinomialQueue{
+		return rootedSkewBinomial{
 			highestPriorityObject: r.highestPriorityObject,
-			priorityQueue:         r.priorityQueue.Enqueue(priority).(SkewBinomialQueue),
+			priorityQueue:         r.priorityQueue.Enqueue(priority).(skewBinomial),
 		}
 	}
-	return RootedSkewBinomialQueue{
+	return rootedSkewBinomial{
 		highestPriorityObject: priority,
 		priorityQueue: r.priorityQueue.Enqueue(
 			r.highestPriorityObject,
-		).(SkewBinomialQueue),
+		).(skewBinomial),
 	}
 }
 
-func (r RootedSkewBinomialQueue) Dequeue() (QueuePriority, RootedSkewBinomialQueue) {
+func (r rootedSkewBinomial) Dequeue() (PriorityScorer, rootedSkewBinomial) {
 	if r.priorityQueue.IsEmpty() {
-		return r.highestPriorityObject, NewEmptyRootedSkewBinomialQueue()
+		return r.highestPriorityObject, newRootedSkewBinomial()
 	}
 	highestPriorityObject, priorityQueue := r.priorityQueue.Dequeue()
-	return r.highestPriorityObject, RootedSkewBinomialQueue{
+	return r.highestPriorityObject, rootedSkewBinomial{
 		highestPriorityObject: highestPriorityObject,
-		priorityQueue:         priorityQueue.(SkewBinomialQueue),
+		priorityQueue:         priorityQueue.(skewBinomial),
 	}
 }
 
-func (r RootedSkewBinomialQueue) Meld(otherQ RootedSkewBinomialQueue) RootedSkewBinomialQueue {
+func (r rootedSkewBinomial) Meld(otherQ rootedSkewBinomial) rootedSkewBinomial {
 	mergedPrimitiveQueue := r.priorityQueue.Meld(otherQ.priorityQueue)
 	if r.highestPriorityObject.LessThan(otherQ.highestPriorityObject) {
-		return RootedSkewBinomialQueue{
+		return rootedSkewBinomial{
 			highestPriorityObject: r.highestPriorityObject,
 			priorityQueue: mergedPrimitiveQueue.Enqueue(
 				otherQ.highestPriorityObject,
-			).(SkewBinomialQueue),
+			).(skewBinomial),
 		}
 	}
-	return RootedSkewBinomialQueue{
+	return rootedSkewBinomial{
 		highestPriorityObject: otherQ.highestPriorityObject,
 		priorityQueue: mergedPrimitiveQueue.Enqueue(
 			r.highestPriorityObject,
-		).(SkewBinomialQueue),
+		).(skewBinomial),
 	}
 }
 
-func (r RootedSkewBinomialQueue) Peek() QueuePriority {
+func (r rootedSkewBinomial) Peek() PriorityScorer {
 	return r.highestPriorityObject
 }
 
-func (r RootedSkewBinomialQueue) Length() int {
+func (r rootedSkewBinomial) Length() int {
 	if r.IsEmpty() {
 		return 0
 	}
 	return 1 + r.priorityQueue.Length()
 }
 
-type BootstrappedSkewBinomialQueue struct {
-	// TODO this thing is going to be super slow because the struct gets really big
-	highestPriorityObject QueuePriority
-	priorityQueue         *SkewBinomialQueue
+type bootstrappedSkewBinomial struct {
+	highestPriorityObject PriorityScorer
+	priorityQueue         *skewBinomial
 	length                int
 }
 
-func NewEmptyBootstrappedSkewBinomialQueue() BootstrappedSkewBinomialQueue {
-	newEmptySkewQ := NewEmptySkewBinomialQueue()
-	return BootstrappedSkewBinomialQueue{
-		highestPriorityObject: nil,
-		priorityQueue:         &newEmptySkewQ,
-		length:                0,
-	}
+func (b bootstrappedSkewBinomial) String() string {
+	return fmt.Sprintf("<bootstrappedSkewBinomial, peek value: %d, length: %d>", b.Peek(), b.Length())
 }
 
-func (b BootstrappedSkewBinomialQueue) String() string {
-	return fmt.Sprintf("<BootstrappedSkewBinomialQueue, peek value: %d, length: %d>", b.Peek(), b.Length())
-}
-
-func (b BootstrappedSkewBinomialQueue) IsEmpty() bool {
+func (b bootstrappedSkewBinomial) IsEmpty() bool {
 	return b.highestPriorityObject == nil
 }
 
-func (b BootstrappedSkewBinomialQueue) Enqueue(priority QueuePriority) BootstrappedSkewBinomialQueue {
-	newEmptySkewQ := NewEmptySkewBinomialQueue()
+func (b bootstrappedSkewBinomial) Enqueue(priority PriorityScorer) bootstrappedSkewBinomial {
+	newEmptySkewQ := newEmptySkewBinomial()
 	return b.Meld(
-		BootstrappedSkewBinomialQueue{
+		bootstrappedSkewBinomial{
 			highestPriorityObject: priority,
 			priorityQueue:         &newEmptySkewQ,
 			length:                1,
@@ -530,34 +507,34 @@ func (b BootstrappedSkewBinomialQueue) Enqueue(priority QueuePriority) Bootstrap
 	)
 }
 
-func (b BootstrappedSkewBinomialQueue) Peek() QueuePriority {
+func (b bootstrappedSkewBinomial) Peek() PriorityScorer {
 	return b.highestPriorityObject
 }
 
-func (b BootstrappedSkewBinomialQueue) Dequeue() (QueuePriority, BootstrappedSkewBinomialQueue) {
+func (b bootstrappedSkewBinomial) Dequeue() (PriorityScorer, bootstrappedSkewBinomial) {
 	return b.DequeueWithMergeCallback(
 		b.priorityQueue.dequeueMergeCallback,
 	)
 }
 
-func (b BootstrappedSkewBinomialQueue) DequeueWithMergeCallback(mergeCallback func([]Node, ...*SkewBinomialQueue) SkewBinomialQueue) (QueuePriority, BootstrappedSkewBinomialQueue) {
+func (b bootstrappedSkewBinomial) DequeueWithMergeCallback(mergeCallback func([]node, ...*skewBinomial) skewBinomial) (PriorityScorer, bootstrappedSkewBinomial) {
 	if b.priorityQueue.IsEmpty() || b.IsEmpty() {
-		return b.highestPriorityObject, NewEmptyBootstrappedSkewBinomialQueue()
+		return b.highestPriorityObject, newEmptyBootstrappedSkewBinomial()
 	}
 	queuePriority, updatedPrimitiveQueue := b.priorityQueue.DequeueWithMergeCallback(mergeCallback)
-	highestPriorityBootstrappedQueue, ok := queuePriority.(BootstrappedSkewBinomialQueue)
+	highestPriorityBootstrappedQueue, ok := queuePriority.(bootstrappedSkewBinomial)
 
 	if !ok {
 		panic("Cannot cast to a Bootstrapped Queue. This case should not have been reached")
 	}
-	updatedSkewQ := updatedPrimitiveQueue.(SkewBinomialQueue)
+	updatedSkewQ := updatedPrimitiveQueue.(skewBinomial)
 	mergedPrimitiveQ := mergeCallback(
-		[]Node{},
+		[]node{},
 		&updatedSkewQ,
 		highestPriorityBootstrappedQueue.priorityQueue,
 	)
 
-	updatedBootstrappedQueue := BootstrappedSkewBinomialQueue{
+	updatedBootstrappedQueue := bootstrappedSkewBinomial{
 		highestPriorityObject: highestPriorityBootstrappedQueue.highestPriorityObject,
 		priorityQueue:         &mergedPrimitiveQ,
 		length:                b.Length() - 1, // FIXME this no longer works w callback, value is wrong
@@ -565,11 +542,11 @@ func (b BootstrappedSkewBinomialQueue) DequeueWithMergeCallback(mergeCallback fu
 	return b.highestPriorityObject, updatedBootstrappedQueue
 }
 
-func (b BootstrappedSkewBinomialQueue) Length() int {
+func (b bootstrappedSkewBinomial) Length() int {
 	return b.length
 }
 
-func (b BootstrappedSkewBinomialQueue) Meld(otherQ BootstrappedSkewBinomialQueue) BootstrappedSkewBinomialQueue {
+func (b bootstrappedSkewBinomial) Meld(otherQ bootstrappedSkewBinomial) bootstrappedSkewBinomial {
 	if b.IsEmpty() {
 		return otherQ
 	} else if otherQ.IsEmpty() {
@@ -577,8 +554,8 @@ func (b BootstrappedSkewBinomialQueue) Meld(otherQ BootstrappedSkewBinomialQueue
 	} else if b.Peek().LessThan(otherQ.Peek()) {
 		priorityQueue := b.priorityQueue.Enqueue(
 			otherQ,
-		).(SkewBinomialQueue)
-		return BootstrappedSkewBinomialQueue{
+		).(skewBinomial)
+		return bootstrappedSkewBinomial{
 			highestPriorityObject: b.Peek(),
 			priorityQueue:         &priorityQueue,
 			length:                b.Length() + otherQ.Length(),
@@ -586,17 +563,17 @@ func (b BootstrappedSkewBinomialQueue) Meld(otherQ BootstrappedSkewBinomialQueue
 	}
 	primitiveQueue := otherQ.priorityQueue.Enqueue(
 		b,
-	).(SkewBinomialQueue)
+	).(skewBinomial)
 
-	return BootstrappedSkewBinomialQueue{
+	return bootstrappedSkewBinomial{
 		highestPriorityObject: otherQ.Peek(),
 		priorityQueue:         &primitiveQueue,
 		length:                b.Length() + otherQ.Length(),
 	}
 }
 
-func (b BootstrappedSkewBinomialQueue) LessThan(otherPriority QueuePriority) bool {
-	otherQ, ok := otherPriority.(BootstrappedSkewBinomialQueue)
+func (b bootstrappedSkewBinomial) LessThan(otherPriority PriorityScorer) bool {
+	otherQ, ok := otherPriority.(bootstrappedSkewBinomial)
 	if ok {
 		if otherQ.IsEmpty() {
 			return true
@@ -608,19 +585,32 @@ func (b BootstrappedSkewBinomialQueue) LessThan(otherPriority QueuePriority) boo
 	return false
 }
 
-func skewQToBootstrappedQ(q SkewBinomialQueue) BootstrappedSkewBinomialQueue {
+func (b bootstrappedSkewBinomial) Score() int {
+	return 0
+}
+
+func newEmptyBootstrappedSkewBinomial() bootstrappedSkewBinomial {
+	newEmptySkewQ := newEmptySkewBinomial()
+	return bootstrappedSkewBinomial{
+		highestPriorityObject: nil,
+		priorityQueue:         &newEmptySkewQ,
+		length:                0,
+	}
+}
+
+func skewQToBootstrappedQ(q skewBinomial) bootstrappedSkewBinomial {
 	if q.IsEmpty() {
-		return NewEmptyBootstrappedSkewBinomialQueue()
+		return newEmptyBootstrappedSkewBinomial()
 	}
 	queuePriority, higherLevelPrimitiveQ := q.Dequeue()
-	bootstrappedQ := queuePriority.(BootstrappedSkewBinomialQueue)
+	bootstrappedQ := queuePriority.(bootstrappedSkewBinomial)
 
-	var highestPriorityObject QueuePriority
+	var highestPriorityObject PriorityScorer
 	highestPriorityObject, bootstrappedQ = bootstrappedQ.Dequeue()
 	higherLevelPrimitiveQ = higherLevelPrimitiveQ.Enqueue(bootstrappedQ)
 
-	skewQ := higherLevelPrimitiveQ.(SkewBinomialQueue)
-	return BootstrappedSkewBinomialQueue{
+	skewQ := higherLevelPrimitiveQ.(skewBinomial)
+	return bootstrappedSkewBinomial{
 		highestPriorityObject: highestPriorityObject,
 		priorityQueue:         &skewQ,
 		length:                q.Length(),
