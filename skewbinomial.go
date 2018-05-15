@@ -573,7 +573,7 @@ func (b bootstrappedSkewBinomial) Meld(otherQ bootstrappedSkewBinomial) bootstra
 	}
 }
 
-func (b bootstrappedSkewBinomial) Score() int {
+func (b bootstrappedSkewBinomial) Score() int64 {
 	if b.IsEmpty() {
 		return math.MaxInt64
 	}

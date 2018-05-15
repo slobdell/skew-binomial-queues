@@ -18,8 +18,8 @@ func (i IntegerPriorityScorer) String() string {
 
 const TEST_TIME = true
 
-func (i IntegerPriorityScorer) Score() int {
-	return i.value
+func (i IntegerPriorityScorer) Score() int64 {
+	return int64(i.value)
 }
 
 func TestEnqueueLength(t *testing.T) {
