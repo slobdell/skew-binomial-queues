@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"runtime"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -17,6 +18,7 @@ var cachedMaxParallelism *int
 
 var FAIL_ADDRESS unsafe.Pointer = unsafe.Pointer(new(int8))
 var meldSignaler = make(chan ParallelQ)
+var once sync.Once
 
 type insertBootstrappedParams struct {
 	q            ParallelQ
@@ -340,6 +342,13 @@ func (q ParallelQ) transformAndInsert(skewQ skewBinomial) {
 }
 
 func newParallelQ() PriorityQ {
+	once.Do(func() {
+		for i := 0; i < int(PARALLELISM_COEFF*float32(MaxParallelism())); i++ {
+			go meldWorker()
+			go asyncInsertWorker()
+			go asyncInsertSkewWorker()
+		}
+	})
 	primitiveQ := newEmptyBootstrappedSkewBinomial()
 	threadSafeList := ThreadSafeList{}
 	threadSafeList.InsertObject(
@@ -354,12 +363,4 @@ func newParallelQ() PriorityQ {
 		meldCounter:     new(int32),
 	}
 	return lazyQ
-}
-
-func init() {
-	for i := 0; i < int(PARALLELISM_COEFF*float32(MaxParallelism())); i++ {
-		go meldWorker()
-		go asyncInsertWorker()
-		go asyncInsertSkewWorker()
-	}
 }
