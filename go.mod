@@ -1,3 +1,3 @@
-module github.com/slobdell/skew-binomial-queues/v3
+module github.com/slobdell/skew-binomial-queues/v4
 
 go 1.18
