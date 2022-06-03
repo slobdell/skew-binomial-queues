@@ -22,11 +22,25 @@ func (i IntegerPriorityScorer) Score() int64 {
 	return int64(i.value)
 }
 
-func (i IntegerPriorityScorer) Compare(other PriorityScorer) bool {
-	if other == nil {
-		panic("wut")
-	}
+func (i IntegerPriorityScorer) LessThan(other PriorityScorer) bool {
 	return i.Score() < other.Score()
+}
+
+type StringPriorityScorer struct {
+	value string
+}
+
+func (s StringPriorityScorer) String() string {
+	return s.value
+}
+
+func (s StringPriorityScorer) Score() int64 {
+	return 0
+}
+
+func (s StringPriorityScorer) LessThan(other PriorityScorer) bool {
+	casted := other.(StringPriorityScorer)
+	return s.value < casted.value
 }
 
 func TestEnqueueLength(t *testing.T) {
@@ -465,33 +479,90 @@ func TestSpeedFreeList(t *testing.T) {
 	}
 	end = time.Now()
 	fmt.Printf("Dequeued %d total items in time: %s\n", dequeueCount, end.Sub(start))
-	/*
-		var priority PriorityScorer
-		for {
-			priority, q = q.Dequeue()
-			//fmt.Printf("Dequeued object: %s\n", priority)
-			something, ok := priority.(IntegerPriorityScorer)
+}
 
-			_, ahfuck := priority.(bootstrappedSkewBinomial)
-			if ahfuck {
-				panic("DAMMIT, BOOTSTRAPPED SKEWS ARE BEING INSERTED INTO OTHER BOOTSTRAPPED SKEWS")
-			}
-			if ok {
-				// successful dequeue
-				dequeueCount++
-			} else {
-				fmt.Printf("Value of something was %s\n", something)
-				fmt.Printf("Stopping after dequeueing %d items\n", dequeueCount)
-				// reached empty queue
-				break
-			}
-		}
-		time.Sleep(1 * time.Second)
-		fmt.Printf("TRYING TO DEQ again\n")
+func TestStrings(t *testing.T) {
+	data := []string{
+		"lively",
+		"vague",
+		"air",
+		"rush",
+		"racial",
+		"bead",
+		"sip",
+		"deserve",
+		"baby",
+		"remain",
+		"vacuous",
+		"birds",
+		"cough",
+		"scratch",
+		"lamentable",
+		"sniff",
+		"skirt",
+		"oil",
+		"carriage",
+		"wash",
+		"grandfather",
+		"try",
+		"obedient",
+		"conscious",
+		"throne",
+		"grandfather",
+	}
+	q := NewImmutableSynchronousQ()
+	for _, d := range data {
+		q = q.Enqueue(
+			StringPriorityScorer{d},
+		)
+	}
+	var got []string
+	for !q.IsEmpty() {
+		var priority PriorityScorer
 		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerPriorityScorer)
-		if ok {
-			fmt.Printf("YOU SUCK AT PROGRAMMING\n")
+		ret, ok := priority.(StringPriorityScorer)
+		if !ok {
+			panic("should not get here")
 		}
-	*/
+		got = append(got, ret.value)
+		fmt.Printf("\"%s\",\n", ret.value)
+	}
+	want := []string{
+		"air",
+		"baby",
+		"bead",
+		"birds",
+		"carriage",
+		"conscious",
+		"cough",
+		"deserve",
+		"grandfather",
+		"grandfather",
+		"lamentable",
+		"lively",
+		"obedient",
+		"oil",
+		"racial",
+		"remain",
+		"rush",
+		"scratch",
+		"sip",
+		"skirt",
+		"sniff",
+		"throne",
+		"try",
+		"vacuous",
+		"vague",
+		"wash",
+	}
+	if len(got) != len(want) {
+		panic("fail")
+	}
+	for i := 0; i < len(want); i++ {
+		g := got[i]
+		w := want[i]
+		if g != w {
+			panic("fail")
+		}
+	}
 }
