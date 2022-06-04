@@ -2,6 +2,8 @@ package priorityq
 
 import (
 	"fmt"
+	"math/rand"
+
 	//"math/rand"
 	"testing"
 	"time"
@@ -436,12 +438,11 @@ func TestSpeedFreeList(t *testing.T) {
 		return
 	}
 	var randomNumbers []int
-	sampleSize := 1000000
-	//var seed int64 = 10
-	//r1 := rand.New(rand.NewSource(seed))
+	sampleSize := 10000
+	var seed int64 = 10
+	r1 := rand.New(rand.NewSource(seed))
 	for i := 0; i < sampleSize; i++ {
-		// randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
-		randomNumbers = append(randomNumbers, i)
+		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
 	}
 
 	start := time.Now()
@@ -469,7 +470,9 @@ func TestSpeedFreeList(t *testing.T) {
 	var priority PriorityScorer
 	for {
 		priority, q = q.Dequeue()
-		_, ok := priority.(IntegerPriorityScorer)
+		val, ok := priority.(IntegerPriorityScorer)
+		val = val
+		// fmt.Printf("%d\n", val.value)
 		if ok {
 			dequeueCount++
 			//fmt.Printf("Value of int is %s\n", intPriority)
@@ -525,7 +528,6 @@ func TestStrings(t *testing.T) {
 			panic("should not get here")
 		}
 		got = append(got, ret.value)
-		fmt.Printf("\"%s\",\n", ret.value)
 	}
 	want := []string{
 		"air",
@@ -564,5 +566,112 @@ func TestStrings(t *testing.T) {
 		if g != w {
 			panic("fail")
 		}
+	}
+}
+
+func TestRangeScan(t *testing.T) {
+	data := []string{
+		"lively",
+		"vague",
+		"air",
+		"rush",
+		"racial",
+		"bead",
+		"sip",
+		"deserve",
+		"baby",
+		"remain",
+		"vacuous",
+		"birds",
+		"cough",
+		"scratch",
+		"lamentable",
+		"sniff",
+		"skirt",
+		"oil",
+		"carriage",
+		"wash",
+		"grandfather",
+		"try",
+		"obedient",
+		"conscious",
+		"throne",
+		"grandfather",
+	}
+	q := NewImmutableSynchronousQ()
+	for _, d := range data {
+		q = q.Enqueue(
+			StringPriorityScorer{d},
+		)
+	}
+	want := []string{
+		"air",
+		"grandfather",
+		"throne",
+		"carriage",
+		"conscious",
+		"grandfather",
+		"obedient",
+		"try",
+		"oil",
+		"wash",
+		"baby",
+		"skirt",
+		"birds",
+		"sniff",
+		"cough",
+		"lamentable",
+		"scratch",
+		"remain",
+		"vacuous",
+		"bead",
+		"deserve",
+		"sip",
+		"lively",
+		"vague",
+		"racial",
+		"rush",
+	}
+
+	var got []string
+	q.UnorderedRangeScan(func(p PriorityScorer) {
+		got = append(got, p.(StringPriorityScorer).value)
+	})
+	if len(got) != len(want) {
+		t.Error("lengths not equal")
+	}
+	for i := 0; i < len(got); i++ {
+		if got[i] != want[i] {
+			t.Error("values not equal")
+		}
+	}
+}
+
+func TestRangeScanMany(t *testing.T) {
+	var randomNumbers []int
+	sampleSize := 10000
+	var seed int64 = 10
+	r1 := rand.New(rand.NewSource(seed))
+	for i := 0; i < sampleSize; i++ {
+		randomNumbers = append(randomNumbers, r1.Intn(sampleSize))
+	}
+
+	q := NewImmutableSynchronousQ()
+	for index, number := range randomNumbers {
+		if index%10000 == 0 {
+			percentDone := 100.0 * (float64(index) / float64(sampleSize))
+			fmt.Printf("%f complete, added %d items\n", percentDone, index)
+		}
+		q = q.Enqueue(
+			IntegerPriorityScorer{number},
+		)
+	}
+	fmt.Printf("Enqueued %d total items\n", len(randomNumbers))
+	var got []int
+	q.UnorderedRangeScan(func(p PriorityScorer) {
+		got = append(got, p.(IntegerPriorityScorer).value)
+	})
+	if len(got) != len(randomNumbers) {
+		panic("something not right")
 	}
 }

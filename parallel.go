@@ -310,6 +310,10 @@ func (q ParallelQ) startInsert(bootstrappedQ bootstrappedSkewBinomial) {
 	}
 }
 
+func (q ParallelQ) UnorderedRangeScan(v Visitor) {
+	// TODO implement
+}
+
 func (q ParallelQ) startInsertSkew(skewQ skewBinomial) {
 	q.incrOpsCount()
 	insertSkewSignaler <- insertSkewParams{

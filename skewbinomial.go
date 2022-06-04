@@ -29,6 +29,7 @@ type node interface {
 	Peek() PriorityScorer
 	Link(heaps ...node) node
 	IsEmpty() bool
+	UnorderedRangeScan(Visitor)
 }
 
 var NULL_OBJECT = nullObject{}
@@ -60,6 +61,9 @@ func (n nullObject) IsEmpty() bool {
 
 func (n nullObject) Length() int {
 	return 0
+}
+
+func (n nullObject) UnorderedRangeScan(Visitor) {
 }
 
 type skewBinomialHeap struct {
@@ -171,6 +175,13 @@ func (s skewBinomialHeap) Peek() PriorityScorer {
 	return s.priority
 }
 
+func (s skewBinomialHeap) UnorderedRangeScan(v Visitor) {
+	v(s.priority)
+	for _, c := range s.children {
+		c.UnorderedRangeScan(v)
+	}
+}
+
 type skewBinomial struct {
 	heapHead     node
 	rightSibling *skewBinomial
@@ -222,6 +233,17 @@ func (q skewBinomial) Enqueue(priority PriorityScorer) PriorityQ {
 	)
 }
 
+func (q skewBinomial) UnorderedRangeScan(v Visitor) {
+	if q.IsEmpty() {
+		return
+	}
+	q.heapHead.UnorderedRangeScan(v)
+	// SBL need to check if rightSibling gets visited twice....
+	if q.rightSibling != nil {
+		q.rightSibling.UnorderedRangeScan(v)
+	}
+}
+
 func (q skewBinomial) Peek() PriorityScorer {
 	if q.heapHead.IsEmpty() {
 		return nil
@@ -236,6 +258,10 @@ func (q skewBinomial) Peek() PriorityScorer {
 		q.heapHead.Peek(),
 		q.rightSibling.Peek(),
 	)
+}
+
+func (q skewBinomial) Score() int64 {
+	return q.Peek().Score()
 }
 
 func (q skewBinomial) Meld(otherQ PriorityQ) PriorityQ {
@@ -495,6 +521,19 @@ func (b bootstrappedSkewBinomial) String() string {
 
 func (b bootstrappedSkewBinomial) IsEmpty() bool {
 	return b.highestPriorityObject == nil
+}
+
+func (b bootstrappedSkewBinomial) UnorderedRangeScan(v Visitor) {
+	if b.IsEmpty() {
+		return
+	}
+	v(b.highestPriorityObject)
+	if b.priorityQueue != nil {
+		b.priorityQueue.UnorderedRangeScan(func(otherQ PriorityScorer) {
+			casted := otherQ.(bootstrappedSkewBinomial)
+			casted.UnorderedRangeScan(v)
+		})
+	}
 }
 
 func (b bootstrappedSkewBinomial) Enqueue(priority PriorityScorer) bootstrappedSkewBinomial {

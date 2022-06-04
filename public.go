@@ -7,7 +7,10 @@ type PriorityQ interface {
 	Dequeue() (PriorityScorer, PriorityQ)
 	Length() int
 	IsEmpty() bool
+	UnorderedRangeScan(Visitor)
 }
+
+type Visitor func(item PriorityScorer)
 
 type PriorityScorer interface {
 	// Score provides a default mechanism to prioritize items;
